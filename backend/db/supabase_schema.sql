@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS users (
     owner_name TEXT,
     profile_picture_url TEXT,
     google_id TEXT, -- Google OAuth user ID
+    is_admin BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -54,6 +55,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'google_id') THEN
         ALTER TABLE users ADD COLUMN google_id TEXT;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'is_admin') THEN
+        ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE;
+    END IF;
     -- Allow NULL password_hash for OAuth users
     ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
 END $$;
@@ -67,13 +71,46 @@ CREATE TABLE IF NOT EXISTS feedbacks (
     business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
     rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
     message TEXT,
+    customer_email TEXT,            -- Optional email from the customer for reply
     is_positive BOOLEAN NOT NULL DEFAULT FALSE,
     notified BOOLEAN DEFAULT FALSE,
-    ai_sentiment TEXT,           -- AI-detected sentiment: 'positive', 'negative', 'neutral'
-    ai_confidence INTEGER,       -- AI confidence score 0-100
+    is_pinned BOOLEAN DEFAULT FALSE,
+    owner_reply TEXT,               -- Business owner's reply to the feedback
+    replied_at TIMESTAMPTZ,         -- When the owner replied
+    source TEXT,                    -- Source: 'qr', 'external', 'google_form', etc.
+    ai_sentiment TEXT,              -- AI-detected sentiment: 'positive', 'negative', 'neutral'
+    ai_confidence INTEGER,          -- AI confidence score 0-100
+    ai_summary TEXT,                -- AI-generated summary for external feedback
+    ai_category TEXT,               -- AI-detected category (Food Quality, Service, etc.)
     sentiment_mismatch BOOLEAN DEFAULT FALSE,  -- true when stars don't match AI sentiment
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add columns if they don't exist (for existing databases)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'feedbacks' AND column_name = 'customer_email') THEN
+        ALTER TABLE feedbacks ADD COLUMN customer_email TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'feedbacks' AND column_name = 'owner_reply') THEN
+        ALTER TABLE feedbacks ADD COLUMN owner_reply TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'feedbacks' AND column_name = 'replied_at') THEN
+        ALTER TABLE feedbacks ADD COLUMN replied_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'feedbacks' AND column_name = 'is_pinned') THEN
+        ALTER TABLE feedbacks ADD COLUMN is_pinned BOOLEAN DEFAULT FALSE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'feedbacks' AND column_name = 'source') THEN
+        ALTER TABLE feedbacks ADD COLUMN source TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'feedbacks' AND column_name = 'ai_summary') THEN
+        ALTER TABLE feedbacks ADD COLUMN ai_summary TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'feedbacks' AND column_name = 'ai_category') THEN
+        ALTER TABLE feedbacks ADD COLUMN ai_category TEXT;
+    END IF;
+END $$;
 
 -- ============================================
 -- INDEXES FOR FASTER QUERIES
@@ -81,7 +118,13 @@ CREATE TABLE IF NOT EXISTS feedbacks (
 CREATE INDEX IF NOT EXISTS idx_feedbacks_business_id ON feedbacks(business_id);
 CREATE INDEX IF NOT EXISTS idx_feedbacks_created_at ON feedbacks(created_at);
 CREATE INDEX IF NOT EXISTS idx_feedbacks_is_positive ON feedbacks(is_positive);
+CREATE INDEX IF NOT EXISTS idx_feedbacks_pinned ON feedbacks(is_pinned) WHERE is_pinned = true;
+CREATE INDEX IF NOT EXISTS idx_feedbacks_replied_at ON feedbacks(replied_at) WHERE replied_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_feedbacks_customer_email ON feedbacks(customer_email) WHERE customer_email IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_feedbacks_sentiment_mismatch ON feedbacks(sentiment_mismatch);
+CREATE INDEX IF NOT EXISTS idx_feedbacks_ai_sentiment ON feedbacks(ai_sentiment);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_is_admin ON users(is_admin);
 
 -- ============================================
 -- TABLE 4: PASSWORD RESET TOKENS
@@ -135,9 +178,31 @@ CREATE TABLE IF NOT EXISTS review_platforms (
 CREATE INDEX IF NOT EXISTS idx_review_platforms_business_id ON review_platforms(business_id);
 CREATE INDEX IF NOT EXISTS idx_review_platforms_platform ON review_platforms(platform_name);
 
--- RLS for review_platforms
-ALTER TABLE review_platforms ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all on review_platforms" ON review_platforms FOR ALL USING (true) WITH CHECK (true);
+-- ============================================
+-- TABLE 7: EXTERNAL SUMMARIES
+-- Stores Google Form summaries, Google Reviews, and other external
+-- feedback text that users paste for AI analysis
+-- ============================================
+CREATE TABLE IF NOT EXISTS external_summaries (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    source_type VARCHAR(50) NOT NULL DEFAULT 'other',
+    title VARCHAR(255),
+    raw_text TEXT NOT NULL,
+    analysis_result JSONB DEFAULT NULL,
+    overall_sentiment VARCHAR(20) DEFAULT NULL,
+    overall_score INTEGER DEFAULT NULL,
+    positive_count INTEGER DEFAULT 0,
+    negative_count INTEGER DEFAULT 0,
+    total_reviews_found INTEGER DEFAULT 0,
+    is_analyzed BOOLEAN DEFAULT FALSE,
+    analyzed_at TIMESTAMPTZ DEFAULT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_external_summaries_business ON external_summaries(business_id);
+CREATE INDEX IF NOT EXISTS idx_external_summaries_created ON external_summaries(created_at DESC);
 
 -- ============================================
 -- ROW LEVEL SECURITY (RLS)
@@ -146,14 +211,20 @@ CREATE POLICY "Allow all on review_platforms" ON review_platforms FOR ALL USING 
 ALTER TABLE businesses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feedbacks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE review_platforms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE external_summaries ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations (backend handles authentication)
-CREATE POLICY "Allow all on businesses" ON businesses FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all on users" ON users FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all on feedbacks" ON feedbacks FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow all on businesses" ON businesses FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow all on users" ON users FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow all on feedbacks" ON feedbacks FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow all on review_platforms" ON review_platforms FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY IF NOT EXISTS "Allow all on email_verification_otps" ON email_verification_otps FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow all on password_reset_tokens" ON password_reset_tokens FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow all on external_summaries" ON external_summaries FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================
 -- SUCCESS! Tables created.
 -- Now go back to your app and sign up!
 -- ============================================
+

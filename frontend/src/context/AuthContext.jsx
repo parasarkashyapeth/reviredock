@@ -12,9 +12,6 @@ export function AuthProvider({ children }) {
 
     // On mount: Check for existing session
     useEffect(() => {
-        // First, clear any old localStorage data from SQLite era
-        localStorage.clear()
-
         // Check sessionStorage for current session token
         const token = sessionStorage.getItem('token')
         if (token) {

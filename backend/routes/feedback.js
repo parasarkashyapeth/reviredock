@@ -84,16 +84,16 @@ router.post('/:businessId', feedbackLimiter, async (req, res) => {
             try {
                 console.log(`[AI] Analyzing sentiment before saving feedback ${feedbackId}...`);
                 const analysis = await analyzeFeedback(message.trim());
-                
+
                 if (analysis && analysis.sentiment) {
                     aiSentiment = analysis.sentiment;
                     aiConfidence = analysis.confidence || 0;
-                    
+
                     // Detect mismatch: high stars + negative text, OR low stars + positive text
-                    sentimentMismatch = 
-                        (rating >= 4 && aiSentiment === 'negative') || 
+                    sentimentMismatch =
+                        (rating >= 4 && aiSentiment === 'negative') ||
                         (rating <= 2 && aiSentiment === 'positive');
-                    
+
                     // Correct is_positive based on AI when there's a mismatch
                     if (sentimentMismatch) {
                         isPositive = aiSentiment === 'positive';
@@ -137,16 +137,24 @@ router.post('/:businessId', feedbackLimiter, async (req, res) => {
         // Send email alert for negative feedback (non-blocking)
         if (!isPositive) {
             try {
+                // Look up the business owner's email from the users table
+                const { data: ownerUser } = await supabase
+                    .from('users')
+                    .select('email')
+                    .eq('business_id', businessId)
+                    .limit(1)
+                    .single();
+
                 const { data: businessDetails } = await supabase
                     .from('businesses')
-                    .select('name, owner_email')
+                    .select('name')
                     .eq('id', businessId)
                     .single();
 
-                if (businessDetails?.owner_email) {
+                if (ownerUser?.email) {
                     sendNegativeFeedbackAlert(
-                        businessDetails.owner_email,
-                        businessDetails.name || 'Your Business',
+                        ownerUser.email,
+                        businessDetails?.name || 'Your Business',
                         { message: message || '', rating, sentiment: aiSentiment }
                     ).catch(err => console.error('[Email] Alert failed:', err.message));
                 }
@@ -165,7 +173,7 @@ router.post('/:businessId', feedbackLimiter, async (req, res) => {
                 .eq('is_primary', true)
                 .eq('is_active', true)
                 .single()
-            
+
             if (primaryPlatform?.url) {
                 reviewUrl = primaryPlatform.url
             }
@@ -463,7 +471,7 @@ router.post('/:businessId/:feedbackId/reply', authenticate, async (req, res) => 
         }
 
         // If reply is empty string, it means "hide/remove reply"
-        const updateData = reply.trim() 
+        const updateData = reply.trim()
             ? { owner_reply: reply.trim(), replied_at: new Date().toISOString() }
             : { owner_reply: null, replied_at: null };
 

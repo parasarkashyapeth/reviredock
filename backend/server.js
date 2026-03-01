@@ -70,7 +70,8 @@ const allowedOrigins = [
     frontendUrl,
     'http://localhost:8000',
     'https://bussiness-feedback-ap8e.vercel.app',
-    'http://localhost:8001'
+    'http://localhost:8001',
+    'https://review-dock.vercel.app'
 ].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
 
 app.use(cors({
@@ -107,14 +108,7 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', database: 'supabase', timestamp: new Date().toISOString() });
 });
 
-// Temporary debug endpoint - REMOVE AFTER FIXING
-app.get('/debug-email-config', (req, res) => {
-    res.json({
-        hasSmtpUser: !!process.env.SMTP_USER,
-        hasSmtpPass: !!process.env.SMTP_PASS,
-        nodeEnv: process.env.NODE_ENV || 'not set'
-    });
-});
+
 
 // Public routes
 app.use('/api/auth', authRoutes);
