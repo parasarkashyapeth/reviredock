@@ -9,7 +9,7 @@ function LoadingSpinner() {
         <div className="min-h-screen flex items-center justify-center bg-black">
             <div className="relative">
                 {/* Outer ring */}
-                <div 
+                <div
                     className="w-16 h-16 rounded-full animate-spin"
                     style={{
                         border: '3px solid rgba(102, 126, 234, 0.2)',
@@ -17,10 +17,10 @@ function LoadingSpinner() {
                     }}
                 />
                 {/* Inner pulse */}
-                <div 
+                <div
                     className="absolute inset-0 flex items-center justify-center"
                 >
-                    <div 
+                    <div
                         className="w-8 h-8 rounded-full animate-pulse"
                         style={{
                             background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
@@ -40,10 +40,12 @@ const Settings = lazy(() => import('./pages/Settings'))
 const Pricing = lazy(() => import('./pages/Pricing'))
 const Feedback = lazy(() => import('./pages/Feedback'))
 const Analytics = lazy(() => import('./pages/Analytics'))
+const AdminPanel = lazy(() => import('./pages/AdminPanel'))
 
 // Regular imports for lighter pages
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import ProfileSetup from './pages/ProfileSetup'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import ThankYou from './pages/ThankYou'
@@ -117,6 +119,13 @@ function AppRoutes() {
                 </PublicRoute>
             } />
 
+            {/* Profile Setup (Step 2 of signup) */}
+            <Route path="/profile-setup" element={
+                <ProtectedRoute>
+                    <ProfileSetup />
+                </ProtectedRoute>
+            } />
+
             {/* Protected Dashboard Routes */}
             <Route path="/welcome" element={
                 <ProtectedRoute>
@@ -151,6 +160,11 @@ function AppRoutes() {
             <Route path="/analytics" element={
                 <ProtectedRoute>
                     <Analytics />
+                </ProtectedRoute>
+            } />
+            <Route path="/admin" element={
+                <ProtectedRoute>
+                    <AdminPanel />
                 </ProtectedRoute>
             } />
 

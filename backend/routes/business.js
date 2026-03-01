@@ -44,9 +44,9 @@ router.get('/:id', async (req, res) => {
  */
 function detectPlatform(url) {
     const lowerUrl = url.toLowerCase();
-    
+
     // Google Maps / Google Business
-    if (lowerUrl.includes('google.com/maps') || 
+    if (lowerUrl.includes('google.com/maps') ||
         lowerUrl.includes('maps.google.com') ||
         lowerUrl.includes('g.page') ||
         lowerUrl.includes('goo.gl') ||
@@ -54,72 +54,72 @@ function detectPlatform(url) {
         (lowerUrl.includes('google.com') && lowerUrl.includes('review'))) {
         return { platform: 'google', label: 'Google Maps' };
     }
-    
+
     // Google Forms
     if (lowerUrl.includes('docs.google.com/forms') || lowerUrl.includes('forms.gle')) {
         return { platform: 'google_forms', label: 'Google Forms' };
     }
-    
+
     // Yelp
     if (lowerUrl.includes('yelp.com')) {
         return { platform: 'yelp', label: 'Yelp' };
     }
-    
+
     // TripAdvisor
     if (lowerUrl.includes('tripadvisor.com') || lowerUrl.includes('tripadvisor.')) {
         return { platform: 'tripadvisor', label: 'TripAdvisor' };
     }
-    
+
     // Facebook
     if (lowerUrl.includes('facebook.com') || lowerUrl.includes('fb.com')) {
         return { platform: 'facebook', label: 'Facebook' };
     }
-    
+
     // Trustpilot
     if (lowerUrl.includes('trustpilot.com')) {
         return { platform: 'trustpilot', label: 'Trustpilot' };
     }
-    
+
     // Zomato
     if (lowerUrl.includes('zomato.com')) {
         return { platform: 'zomato', label: 'Zomato' };
     }
-    
+
     // Swiggy
     if (lowerUrl.includes('swiggy.com')) {
         return { platform: 'swiggy', label: 'Swiggy' };
     }
-    
+
     // SurveyMonkey
     if (lowerUrl.includes('surveymonkey.com') || lowerUrl.includes('surveymonkey.')) {
         return { platform: 'surveymonkey', label: 'SurveyMonkey' };
     }
-    
+
     // Typeform
     if (lowerUrl.includes('typeform.com')) {
         return { platform: 'typeform', label: 'Typeform' };
     }
-    
+
     // JotForm
     if (lowerUrl.includes('jotform.com')) {
         return { platform: 'jotform', label: 'JotForm' };
     }
-    
+
     // Amazon
     if (lowerUrl.includes('amazon.com') || lowerUrl.includes('amazon.in')) {
         return { platform: 'amazon', label: 'Amazon' };
     }
-    
+
     // Booking.com
     if (lowerUrl.includes('booking.com')) {
         return { platform: 'booking', label: 'Booking.com' };
     }
-    
+
     // Airbnb
     if (lowerUrl.includes('airbnb.com') || lowerUrl.includes('airbnb.')) {
         return { platform: 'airbnb', label: 'Airbnb' };
     }
-    
+
     // Default: custom platform
     return { platform: 'custom', label: 'Custom' };
 }
@@ -140,17 +140,17 @@ router.post('/validate-review-url', async (req, res) => {
         try {
             new URL(url);
         } catch {
-            return res.json({ 
-                valid: false, 
+            return res.json({
+                valid: false,
                 error: 'Invalid URL format. Please enter a valid URL starting with http:// or https://'
             });
         }
 
         // SECURITY: SSRF protection — block private/internal IPs
         if (!isSafeUrl(url)) {
-            return res.json({ 
-                valid: false, 
-                error: 'URL points to a restricted address and cannot be validated' 
+            return res.json({
+                valid: false,
+                error: 'URL points to a restricted address and cannot be validated'
             });
         }
 
@@ -173,14 +173,14 @@ router.post('/validate-review-url', async (req, res) => {
             clearTimeout(timeoutId);
 
             if (response.ok || response.status === 301 || response.status === 302 || response.status === 307) {
-                return res.json({ 
-                    valid: true, 
+                return res.json({
+                    valid: true,
                     platform,
                     label,
                     message: `${label} URL is valid and accessible`
                 });
             } else {
-                return res.json({ 
+                return res.json({
                     valid: true, // Still allow it
                     platform,
                     label,
@@ -189,8 +189,8 @@ router.post('/validate-review-url', async (req, res) => {
             }
         } catch (fetchError) {
             // Allow URL if format is valid even if we can't fetch it
-            return res.json({ 
-                valid: true, 
+            return res.json({
+                valid: true,
                 platform,
                 label,
                 message: 'URL format is valid',
@@ -214,7 +214,7 @@ router.post('/validate-google-url', async (req, res) => {
 
         // Check URL format first
         const lowerUrl = url.toLowerCase();
-        const isValidFormat = 
+        const isValidFormat =
             lowerUrl.includes('google.com/maps') ||
             lowerUrl.includes('maps.google.com') ||
             lowerUrl.includes('g.page') ||
@@ -223,8 +223,8 @@ router.post('/validate-google-url', async (req, res) => {
             (lowerUrl.includes('google.com') && lowerUrl.includes('review'));
 
         if (!isValidFormat) {
-            return res.json({ 
-                valid: false, 
+            return res.json({
+                valid: false,
                 error: 'URL does not appear to be a valid Google review link. Please use a link from Google Maps or Google Business Profile.',
                 suggestion: 'Valid formats: https://g.page/r/..., https://maps.google.com/..., or your Google Maps business link'
             });
@@ -247,13 +247,13 @@ router.post('/validate-google-url', async (req, res) => {
 
             // Check for successful response or redirect (Google often redirects)
             if (response.ok || response.status === 301 || response.status === 302 || response.status === 307) {
-                return res.json({ 
-                    valid: true, 
+                return res.json({
+                    valid: true,
                     message: 'Google review URL is valid and accessible'
                 });
             } else {
-                return res.json({ 
-                    valid: false, 
+                return res.json({
+                    valid: false,
                     error: `URL returned status ${response.status}. Please verify the link is correct.`
                 });
             }
@@ -261,16 +261,16 @@ router.post('/validate-google-url', async (req, res) => {
             // If fetch fails, still allow the URL if it has the right format
             // Some Google URLs may block bots but still work for users
             if (fetchError.name === 'AbortError') {
-                return res.json({ 
-                    valid: true, 
+                return res.json({
+                    valid: true,
                     message: 'URL format is valid (response timeout - may still work)',
                     warning: 'Could not fully verify the URL, but format appears correct'
                 });
             }
-            
+
             console.log('URL validation fetch error:', fetchError.message);
-            return res.json({ 
-                valid: true, 
+            return res.json({
+                valid: true,
                 message: 'URL format is valid',
                 warning: 'Could not fully verify accessibility, but format appears correct'
             });
@@ -278,6 +278,56 @@ router.post('/validate-google-url', async (req, res) => {
     } catch (error) {
         console.error('Validate Google URL error:', error);
         res.status(500).json({ valid: false, error: 'Failed to validate URL' });
+    }
+});
+/**
+ * PUT /api/business/profile
+ * Update business profile after signup (authenticated)
+ * Used by the ProfileSetup page (step 2 of signup)
+ */
+router.put('/profile', authenticate, async (req, res) => {
+    try {
+        const { businessId, userId } = req.user;
+        const { businessName, category, logoUrl, ownerName } = req.body;
+
+        if (!businessName || !category) {
+            return res.status(400).json({ error: 'Business name and category are required' });
+        }
+
+        // Update business
+        const businessUpdates = {
+            name: businessName,
+            category,
+        };
+        if (logoUrl !== undefined) businessUpdates.logo_url = logoUrl;
+
+        const { error: bizError } = await supabase
+            .from('businesses')
+            .update(businessUpdates)
+            .eq('id', businessId);
+
+        if (bizError) {
+            console.error('Profile update - business error:', bizError);
+            return res.status(500).json({ error: 'Failed to update business' });
+        }
+
+        // Update owner name on user record
+        if (ownerName !== undefined) {
+            const { error: userError } = await supabase
+                .from('users')
+                .update({ owner_name: ownerName })
+                .eq('id', userId);
+
+            if (userError) {
+                console.error('Profile update - user error:', userError);
+                // Don't fail the whole request for this
+            }
+        }
+
+        res.json({ message: 'Profile updated successfully' });
+    } catch (error) {
+        console.error('Profile update error:', error);
+        res.status(500).json({ error: 'Failed to update profile' });
     }
 });
 
@@ -430,7 +480,7 @@ router.post('/:id/platforms', authenticate, async (req, res) => {
                 .eq('id', id);
         }
 
-        res.json({ 
+        res.json({
             message: 'Platform added successfully',
             platform: newPlatform
         });
@@ -455,18 +505,18 @@ router.put('/:id/platforms/:platformId', authenticate, async (req, res) => {
         }
 
         const updates = {};
-        
+
         if (url) {
             const { platform, label } = detectPlatform(url);
             updates.url = url;
             updates.platform_name = platform;
             updates.platform_label = customLabel || label;
         }
-        
+
         if (customLabel) {
             updates.platform_label = customLabel;
         }
-        
+
         if (typeof isActive === 'boolean') {
             updates.is_active = isActive;
         }
@@ -504,7 +554,7 @@ router.put('/:id/platforms/:platformId', authenticate, async (req, res) => {
                 .eq('id', id);
         }
 
-        res.json({ 
+        res.json({
             message: 'Platform updated successfully',
             platform: updatedPlatform
         });
@@ -983,10 +1033,10 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
         // Calculate averages and format for chart
         const chartData = labels.map(label => {
             const data = groupedData[label];
-            const avgRating = data.ratings.length > 0 
+            const avgRating = data.ratings.length > 0
                 ? (data.ratings.reduce((a, b) => a + b, 0) / data.ratings.length).toFixed(1)
                 : 0;
-            
+
             // Format label for display
             let displayLabel = label;
             if (groupBy === 'day') {

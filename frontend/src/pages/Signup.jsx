@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import Threads from '../components/Threads'
@@ -30,46 +30,20 @@ if (typeof document !== 'undefined' && !document.getElementById(GLASS_KEYFRAMES_
     document.head.appendChild(style);
 }
 
-const BUSINESS_CATEGORIES = [
-    'Restaurant',
-    'Café',
-    'Gym',
-    'Clinic',
-    'Salon',
-    'Spa',
-    'Hotel',
-    'Retail Store',
-    'Other'
-]
-
 export default function Signup() {
     const [formData, setFormData] = useState({
-        ownerName: '',
-        businessName: '',
-        category: '',
-        customCategory: '',
-        logoUrl: '',
         email: '',
         password: '',
         confirmPassword: ''
     })
-    
-    // Review platforms state (multiple platforms)
-    const [reviewPlatforms, setReviewPlatforms] = useState([
-        { url: '', valid: null, validating: false, message: '', platform: '', label: '' }
-    ])
-    
-    const [profileImage, setProfileImage] = useState(null)
-    const [profileImagePreview, setProfileImagePreview] = useState(null)
+
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
-    const [uploadingImage, setUploadingImage] = useState(false)
-    const fileInputRef = useRef(null)
-    
+
     // Google OAuth states
     const [googleData, setGoogleData] = useState(null)
     const [googleLoading, setGoogleLoading] = useState(false)
-    
+
     // OTP verification states
     const [showOtpStep, setShowOtpStep] = useState(false)
     const [otp, setOtp] = useState('')
@@ -79,51 +53,50 @@ export default function Signup() {
     const [otpSent, setOtpSent] = useState(false)
     const [otpCountdown, setOtpCountdown] = useState(0)
 
-    const { signup, getApiUrl, updateUser, magicLinkAuth, sendMagicLink } = useAuth()
+    const { signup, signInWithGoogle } = useAuth()
     const navigate = useNavigate()
     const location = useLocation()
 
-    // Handle data passed from auth callback (magic link)
+    // Handle data passed from Google auth or other sources
     useEffect(() => {
         if (location.state?.googleData) {
             const gData = location.state.googleData
             setGoogleData(gData)
             setFormData(prev => ({
                 ...prev,
-                ownerName: gData.name || '',
                 email: gData.email || '',
             }))
-            // Set profile picture if available
-            if (gData.picture) {
-                setProfileImagePreview(gData.picture)
-            }
-            // Email is verified via magic link
+            // Email is verified via Google
             setOtpVerified(true)
         }
     }, [location.state])
 
-    const [magicEmail, setMagicEmail] = useState('')
-    const [magicSuccess, setMagicSuccess] = useState('')
-
-    const handleMagicLinkSignUp = async () => {
-        const emailToSend = magicEmail || formData.email
-        if (!emailToSend) {
-            setError('Please enter your email address')
-            return
-        }
+    const handleGoogleSignUp = async () => {
         setGoogleLoading(true)
         setError('')
-        setMagicSuccess('')
 
         try {
-            await sendMagicLink(emailToSend)
-            setMagicSuccess('Magic link sent! Check your email inbox and click the link to continue sign up.')
+            const result = await signInWithGoogle()
+
+            if (result.needsSignup) {
+                // New user — prefill and stay on this page
+                setGoogleData(result.googleData)
+                setFormData(prev => ({
+                    ...prev,
+                    email: result.googleData.email || '',
+                }))
+                setOtpVerified(true) // Email verified by Google
+            } else {
+                // Existing user — go to dashboard
+                navigate('/dashboard')
+            }
         } catch (err) {
             setError(err.message)
         } finally {
             setGoogleLoading(false)
         }
     }
+
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value })
         // Reset OTP verification if email changes
@@ -132,108 +105,6 @@ export default function Signup() {
             setShowOtpStep(false)
             setOtp('')
             setOtpSent(false)
-        }
-    }
-
-    // Handle platform URL change
-    const handlePlatformChange = (index, value) => {
-        const updated = [...reviewPlatforms]
-        updated[index] = { ...updated[index], url: value, valid: null, message: '', platform: '', label: '' }
-        setReviewPlatforms(updated)
-    }
-
-    // Add new platform
-    const addPlatform = () => {
-        if (reviewPlatforms.length < 5) {
-            setReviewPlatforms([...reviewPlatforms, { url: '', valid: null, validating: false, message: '', platform: '', label: '' }])
-        }
-    }
-
-    // Remove platform
-    const removePlatform = (index) => {
-        if (reviewPlatforms.length > 1) {
-            setReviewPlatforms(reviewPlatforms.filter((_, i) => i !== index))
-        }
-    }
-
-    // Validate Review URL (any platform)
-    const validateReviewUrl = async (index) => {
-        const platform = reviewPlatforms[index]
-        if (!platform.url) {
-            setError('Please enter a URL')
-            return
-        }
-
-        const updated = [...reviewPlatforms]
-        updated[index] = { ...updated[index], validating: true, message: '' }
-        setReviewPlatforms(updated)
-        setError('')
-
-        try {
-            const response = await fetch(`${API_URL}/api/business/validate-review-url`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: platform.url })
-            })
-
-            const data = await response.json()
-
-            updated[index] = { 
-                ...updated[index], 
-                validating: false,
-                valid: data.valid,
-                message: data.message || data.error || '',
-                platform: data.platform || 'custom',
-                label: data.label || 'Custom'
-            }
-            setReviewPlatforms([...updated])
-            
-            if (!data.valid) {
-                setError(data.error || 'Invalid URL')
-            }
-        } catch (err) {
-            updated[index] = { ...updated[index], validating: false, valid: false, message: 'Failed to validate URL' }
-            setReviewPlatforms([...updated])
-            setError('Failed to validate URL')
-        }
-    }
-
-    // Get platform icon
-    const getPlatformIcon = (platform) => {
-        const icons = {
-            google: 'Google',
-            google_forms: 'Form',
-            yelp: 'Review',
-            tripadvisor: 'Trip',
-            facebook: 'FB',
-            trustpilot: 'Review',
-            zomato: 'Zomato',
-            swiggy: 'Swiggy',
-            surveymonkey: 'Survey',
-            typeform: 'Form',
-            jotform: 'Form',
-            amazon: 'Amazon',
-            booking: 'Booking',
-            airbnb: 'Airbnb',
-            custom: 'Link'
-        }
-        return icons[platform] || 'Link'
-    }
-
-    const handleImageChange = (e) => {
-        const file = e.target.files[0]
-        if (file) {
-            if (file.size > 5 * 1024 * 1024) {
-                setError('Image size must be less than 5MB')
-                return
-            }
-
-            const reader = new FileReader()
-            reader.onloadend = () => {
-                setProfileImage(reader.result)
-                setProfileImagePreview(reader.result)
-            }
-            reader.readAsDataURL(file)
         }
     }
 
@@ -258,9 +129,9 @@ export default function Signup() {
             const response = await fetch(`${API_URL}/api/auth/send-otp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     email: formData.email,
-                    businessName: formData.businessName 
+                    businessName: 'New Business'
                 })
             })
 
@@ -272,9 +143,8 @@ export default function Signup() {
 
             setOtpSent(true)
             setShowOtpStep(true)
-            setOtpCountdown(60) // 60 second countdown for resend
+            setOtpCountdown(60)
 
-            // Start countdown
             const interval = setInterval(() => {
                 setOtpCountdown(prev => {
                     if (prev <= 1) {
@@ -327,7 +197,7 @@ export default function Signup() {
         e.preventDefault()
         setError('')
 
-        // Check if email is verified (skip for Google users - already verified)
+        // Check if email is verified (skip for Google users)
         if (!otpVerified && !googleData) {
             setError('Please verify your email address first')
             return
@@ -335,7 +205,6 @@ export default function Signup() {
 
         // Password validation only for non-Google signups
         if (!googleData) {
-            // Validation
             if (formData.password !== formData.confirmPassword) {
                 setError('Passwords do not match')
                 return
@@ -347,69 +216,27 @@ export default function Signup() {
             }
         }
 
-        // Validate custom category if Other is selected
-        if (formData.category === 'Other' && !formData.customCategory.trim()) {
-            setError('Please specify your business type')
-            return
-        }
-
         setLoading(true)
 
         try {
-            // Create signup data - use customCategory if Other is selected
-            const finalCategory = formData.category === 'Other' 
-                ? formData.customCategory.trim() 
-                : formData.category
-
+            // Create account with a placeholder business name
+            // The ProfileSetup page (step 2) will update these
             const signupData = {
-                businessName: formData.businessName,
-                category: finalCategory,
+                businessName: 'My Business',
+                category: 'Other',
                 googleReviewUrl: '',
-                logoUrl: formData.logoUrl || null,
                 email: formData.email,
                 password: googleData ? null : formData.password,
-                ownerName: formData.ownerName || null,
+                ownerName: googleData?.name || null,
                 profilePictureUrl: googleData?.picture || null,
                 reviewPlatforms: [],
                 googleId: googleData?.googleId || googleData?.sub || null
             }
 
-            // Sign up the user first
             await signup(signupData)
 
-            // Upload profile picture if selected
-            if (profileImage) {
-                setUploadingImage(true)
-                try {
-                    const token = sessionStorage.getItem('token')
-                    const API_URL = getApiUrl()
-
-                    const uploadResponse = await fetch(`${API_URL}/api/upload/avatar`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({
-                            imageData: profileImage
-                        })
-                    })
-
-                    if (uploadResponse.ok) {
-                        const uploadData = await uploadResponse.json()
-                        // Update the user context with the new profile picture URL
-                        updateUser({ profilePictureUrl: uploadData.url })
-                    } else {
-                        console.error('Failed to upload profile picture')
-                    }
-                } catch (uploadError) {
-                    console.error('Upload error:', uploadError)
-                } finally {
-                    setUploadingImage(false)
-                }
-            }
-
-            navigate('/welcome')
+            // Navigate to profile setup (step 2) instead of welcome
+            navigate('/profile-setup')
         } catch (err) {
             setError(err.message)
         } finally {
@@ -430,14 +257,14 @@ export default function Signup() {
             </div>
 
             {/* Glass Card Container */}
-            <div 
+            <div
                 className="w-full max-w-md relative z-10"
                 style={{
                     animation: 'fadeInUp 0.8s ease-out',
                 }}
             >
                 {/* Glow Effect Behind Card */}
-                <div 
+                <div
                     className="absolute inset-0 -z-10 blur-3xl opacity-50"
                     style={{
                         background: 'radial-gradient(circle at 50% 50%, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.2) 50%, transparent 70%)',
@@ -446,7 +273,7 @@ export default function Signup() {
                 />
 
                 {/* Glass Card */}
-                <div 
+                <div
                     className="relative overflow-hidden rounded-3xl p-6 sm:p-8 max-h-[85vh] overflow-y-auto"
                     style={{
                         background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
@@ -458,7 +285,7 @@ export default function Signup() {
                     }}
                 >
                     {/* Shine Effect */}
-                    <div 
+                    <div
                         className="absolute inset-0 pointer-events-none opacity-30"
                         style={{
                             background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%)',
@@ -469,7 +296,26 @@ export default function Signup() {
 
                     {/* Header */}
                     <div className="text-center mb-6 relative">
-                        <div 
+                        {/* Step indicator */}
+                        <div className="flex items-center justify-center gap-2 mb-4">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%)',
+                                    border: '1px solid rgba(102, 126, 234, 0.5)',
+                                    color: '#a5b4fc',
+                                }}
+                            >1</div>
+                            <div className="w-8 h-px bg-white/20" />
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    color: 'rgba(255, 255, 255, 0.3)',
+                                }}
+                            >2</div>
+                        </div>
+
+                        <div
                             className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
                             style={{
                                 background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
@@ -478,7 +324,7 @@ export default function Signup() {
                         >
                             <span className="text-3xl" style={{ filter: 'drop-shadow(0 0 6px rgba(165, 180, 252, 0.5))' }}>⚓</span>
                         </div>
-                        <h1 
+                        <h1
                             className="text-3xl font-bold mb-2"
                             style={{
                                 background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
@@ -487,33 +333,18 @@ export default function Signup() {
                                 backgroundClip: 'text',
                             }}
                         >
-                            Join ReviewDock
+                            Create Account
                         </h1>
-                        <p className="text-white/60">Set up your review system in minutes</p>
+                        <p className="text-white/60">Step 1: Set up your credentials</p>
                     </div>
 
-                    {/* Magic Link Sign-Up Option - only show if not already using magic link */}
+                    {/* Google Sign-Up Option */}
                     {!googleData && (
                         <>
-                            <div className="relative mb-4">
-                                <input
-                                    type="email"
-                                    value={magicEmail}
-                                    onChange={(e) => setMagicEmail(e.target.value)}
-                                    className="w-full px-4 py-3.5 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
-                                    style={{
-                                        background: 'rgba(255, 255, 255, 0.08)',
-                                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                                        backdropFilter: 'blur(10px)',
-                                    }}
-                                    placeholder="Enter email for magic link"
-                                    disabled={googleLoading}
-                                />
-                            </div>
                             <div className="relative mb-2">
                                 <button
                                     type="button"
-                                    onClick={handleMagicLinkSignUp}
+                                    onClick={handleGoogleSignUp}
                                     disabled={googleLoading}
                                     className="w-full py-3.5 rounded-xl font-semibold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
                                     style={{
@@ -526,191 +357,32 @@ export default function Signup() {
                                     {googleLoading ? (
                                         <span className="flex items-center gap-2">
                                             <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
-                                            Sending...
+                                            Connecting...
                                         </span>
                                     ) : (
                                         <>
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <rect x="2" y="4" width="20" height="16" rx="2"/>
-                                                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                                            <svg width="20" height="20" viewBox="0 0 48 48">
+                                                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                                                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                                                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                                                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
                                             </svg>
-                                            Sign up with Magic Link
+                                            Sign up with Google
                                         </>
                                     )}
                                 </button>
-                                <p className="text-xs text-white/40 text-center mt-2">We'll email you a sign-in link — no password needed</p>
                             </div>
-
-                            {magicSuccess && (
-                                <div 
-                                    className="mb-4 p-3 rounded-xl text-sm text-center"
-                                    style={{
-                                        background: 'rgba(34, 197, 94, 0.2)',
-                                        border: '1px solid rgba(34, 197, 94, 0.3)',
-                                        color: '#86efac',
-                                    }}
-                                >
-                                    {magicSuccess}
-                                </div>
-                            )}
 
                             {/* Divider */}
                             <div className="flex items-center mb-6 mt-4">
                                 <div className="flex-1 h-px bg-white/10"></div>
-                                <span className="px-4 text-sm text-white/40">or fill out the form</span>
+                                <span className="px-4 text-sm text-white/40">or sign up with email</span>
                                 <div className="flex-1 h-px bg-white/10"></div>
                             </div>
                         </>
                     )}
 
                     <form onSubmit={handleSubmit} className="relative">
-                        {/* Profile Picture Upload */}
-                        <div className="mb-6 flex flex-col items-center">
-                            <div
-                                onClick={() => fileInputRef.current?.click()}
-                                className="w-24 h-24 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-105 overflow-hidden relative"
-                                style={{
-                                    background: 'rgba(255, 255, 255, 0.08)',
-                                    border: '2px dashed rgba(255, 255, 255, 0.2)',
-                                }}
-                            >
-                                {profileImagePreview ? (
-                                    <img
-                                        src={profileImagePreview}
-                                        alt="Profile preview"
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="text-center">
-                                        <span className="text-3xl">📷</span>
-                                        <p className="text-xs text-white/50 mt-1">Add Photo</p>
-                                    </div>
-                                )}
-                            </div>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageChange}
-                                className="hidden"
-                                disabled={loading}
-                            />
-                            <p className="text-xs text-white/40 mt-2">Click to upload profile picture</p>
-                        </div>
-
-                        {/* Owner Name */}
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-white/80 mb-2">
-                                Your Name
-                            </label>
-                            <input
-                                type="text"
-                                name="ownerName"
-                                value={formData.ownerName}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
-                                style={{
-                                    background: 'rgba(255, 255, 255, 0.08)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                }}
-                                placeholder="John Doe"
-                                disabled={loading}
-                            />
-                        </div>
-
-                        {/* Business Name */}
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-white/80 mb-2">
-                                Business Name *
-                            </label>
-                            <input
-                                type="text"
-                                name="businessName"
-                                value={formData.businessName}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
-                                style={{
-                                    background: 'rgba(255, 255, 255, 0.08)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                }}
-                                placeholder="Your Business Name"
-                                required
-                                disabled={loading}
-                            />
-                        </div>
-
-                        {/* Category */}
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-white/80 mb-2">
-                                Business Category *
-                            </label>
-                            <select
-                                name="category"
-                                value={formData.category}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-xl text-white transition-all duration-300 focus:outline-none appearance-none cursor-pointer"
-                                style={{
-                                    background: 'rgba(255, 255, 255, 0.08)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                }}
-                                required
-                                disabled={loading}
-                            >
-                                <option value="" className="bg-gray-900 text-white">Select a category</option>
-                                {BUSINESS_CATEGORIES.map((cat) => (
-                                    <option key={cat} value={cat} className="bg-gray-900 text-white">{cat}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Custom Category - shown when Other is selected */}
-                        {formData.category === 'Other' && (
-                            <div className="mb-4" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
-                                <label className="block text-sm font-medium text-white/80 mb-2">
-                                    Specify Your Business Type *
-                                </label>
-                                <input
-                                    type="text"
-                                    name="customCategory"
-                                    value={formData.customCategory}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
-                                    style={{
-                                        background: 'rgba(255, 255, 255, 0.08)',
-                                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                                    }}
-                                    placeholder="e.g., Bakery, Pet Shop, Laundry..."
-                                    required
-                                    disabled={loading}
-                                />
-                            </div>
-                        )}
-
-                        {/* Logo URL (Optional) */}
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-white/80 mb-2">
-                                Logo URL (optional)
-                            </label>
-                            <input
-                                type="url"
-                                name="logoUrl"
-                                value={formData.logoUrl}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
-                                style={{
-                                    background: 'rgba(255, 255, 255, 0.08)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                }}
-                                placeholder="https://example.com/your-logo.png"
-                                disabled={loading}
-                            />
-                            <p className="text-xs text-white/40 mt-1">
-                                Link to your business logo image (shows on feedback page)
-                            </p>
-                        </div>
-
-                        <hr className="my-6 border-white/10" />
-
                         {/* Email with OTP Verification */}
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-white/80 mb-2">
@@ -728,15 +400,15 @@ export default function Signup() {
                                     className="flex-1 px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
                                     style={{
                                         background: 'rgba(255, 255, 255, 0.08)',
-                                        border: otpVerified 
-                                            ? '1px solid rgba(34, 197, 94, 0.5)' 
+                                        border: otpVerified
+                                            ? '1px solid rgba(34, 197, 94, 0.5)'
                                             : '1px solid rgba(255, 255, 255, 0.1)',
                                     }}
                                     placeholder="you@business.com"
                                     required
                                     disabled={loading || otpVerified}
                                 />
-                                {!otpVerified && (
+                                {!otpVerified && !googleData && (
                                     <button
                                         type="button"
                                         onClick={handleSendOtp}
@@ -755,7 +427,7 @@ export default function Signup() {
                             </div>
                         </div>
 
-                        {/* OTP Input - shown after sending OTP */}
+                        {/* OTP Input */}
                         {showOtpStep && !otpVerified && (
                             <div className="mb-4" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
                                 <label className="block text-sm font-medium text-white/80 mb-2">
@@ -848,7 +520,7 @@ export default function Signup() {
 
                         {/* Google signup notice */}
                         {googleData && (
-                            <div 
+                            <div
                                 className="mb-6 p-3 rounded-xl text-sm text-center"
                                 style={{
                                     background: 'rgba(34, 197, 94, 0.15)',
@@ -862,7 +534,7 @@ export default function Signup() {
                         )}
 
                         {error && (
-                            <div 
+                            <div
                                 className="mb-4 p-3 rounded-xl text-sm text-center"
                                 style={{
                                     background: 'rgba(239, 68, 68, 0.2)',
@@ -885,7 +557,7 @@ export default function Signup() {
                             }}
                         >
                             {/* Button Shine */}
-                            <span 
+                            <span
                                 className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
                                 style={{
                                     background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
@@ -896,10 +568,10 @@ export default function Signup() {
                                 {loading ? (
                                     <span className="flex items-center justify-center">
                                         <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></span>
-                                        {uploadingImage ? 'Uploading photo...' : 'Creating account...'}
+                                        Creating account...
                                     </span>
                                 ) : (
-                                    'Create Account'
+                                    'Continue →'
                                 )}
                             </span>
                         </button>
@@ -907,8 +579,8 @@ export default function Signup() {
 
                     <p className="text-center text-white/50 mt-6">
                         Already have an account?{' '}
-                        <Link 
-                            to="/login" 
+                        <Link
+                            to="/login"
                             className="font-medium transition-colors"
                             style={{
                                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',

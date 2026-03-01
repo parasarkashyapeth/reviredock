@@ -21,14 +21,6 @@ if (typeof document !== 'undefined' && !document.getElementById(GLASS_KEYFRAMES_
             0%, 100% { border-color: rgba(255, 255, 255, 0.1); }
             50% { border-color: rgba(255, 255, 255, 0.25); }
         }
-        @keyframes floatCard {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-8px); }
-        }
-        @keyframes inputFocus {
-            0% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
-            100% { box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3); }
-        }
     `;
     document.head.appendChild(style);
 }
@@ -36,31 +28,31 @@ if (typeof document !== 'undefined' && !document.getElementById(GLASS_KEYFRAMES_
 export default function Login() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
-    const [magicEmail, setMagicEmail] = useState('')
     const [error, setError] = useState('')
-    const [success, setSuccess] = useState('')
     const [loading, setLoading] = useState(false)
-    const [magicLoading, setMagicLoading] = useState(false)
+    const [googleLoading, setGoogleLoading] = useState(false)
 
-    const { login, sendMagicLink } = useAuth()
+    const { login, signInWithGoogle } = useAuth()
     const navigate = useNavigate()
 
-    const handleMagicLink = async () => {
-        if (!magicEmail) {
-            setError('Please enter your email address')
-            return
-        }
-        setMagicLoading(true)
+    const handleGoogleSignIn = async () => {
+        setGoogleLoading(true)
         setError('')
-        setSuccess('')
 
         try {
-            await sendMagicLink(magicEmail)
-            setSuccess('Magic link sent! Check your email inbox and click the link to sign in.')
+            const result = await signInWithGoogle()
+
+            if (result.needsSignup) {
+                // New user — redirect to signup with Google data prefilled
+                navigate('/signup', { state: { googleData: result.googleData } })
+            } else {
+                // Existing user — go to dashboard
+                navigate('/dashboard')
+            }
         } catch (err) {
             setError(err.message)
         } finally {
-            setMagicLoading(false)
+            setGoogleLoading(false)
         }
     }
 
@@ -92,14 +84,14 @@ export default function Login() {
             </div>
 
             {/* Glass Card Container */}
-            <div 
+            <div
                 className="w-full max-w-md relative z-10"
                 style={{
                     animation: 'fadeInUp 0.8s ease-out',
                 }}
             >
                 {/* Glow Effect Behind Card */}
-                <div 
+                <div
                     className="absolute inset-0 -z-10 blur-3xl opacity-50"
                     style={{
                         background: 'radial-gradient(circle at 50% 50%, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.2) 50%, transparent 70%)',
@@ -108,7 +100,7 @@ export default function Login() {
                 />
 
                 {/* Glass Card */}
-                <div 
+                <div
                     className="relative overflow-hidden rounded-3xl p-8"
                     style={{
                         background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
@@ -120,7 +112,7 @@ export default function Login() {
                     }}
                 >
                     {/* Shine Effect */}
-                    <div 
+                    <div
                         className="absolute inset-0 pointer-events-none opacity-30"
                         style={{
                             background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%)',
@@ -131,7 +123,7 @@ export default function Login() {
 
                     {/* Header */}
                     <div className="text-center mb-8 relative">
-                        <div 
+                        <div
                             className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
                             style={{
                                 background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
@@ -141,7 +133,7 @@ export default function Login() {
                         >
                             <span className="text-3xl" style={{ filter: 'drop-shadow(0 0 6px rgba(165, 180, 252, 0.5))' }}>⚓</span>
                         </div>
-                        <h1 
+                        <h1
                             className="text-3xl font-bold mb-2"
                             style={{
                                 background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
@@ -197,8 +189,8 @@ export default function Login() {
                         </div>
 
                         <div className="mb-6 text-right">
-                            <Link 
-                                to="/forgot-password" 
+                            <Link
+                                to="/forgot-password"
                                 className="text-sm text-white/60 hover:text-white/90 transition-colors"
                             >
                                 Forgot password?
@@ -206,7 +198,7 @@ export default function Login() {
                         </div>
 
                         {error && (
-                            <div 
+                            <div
                                 className="mb-4 p-3 rounded-xl text-sm text-center"
                                 style={{
                                     background: 'rgba(239, 68, 68, 0.2)',
@@ -215,19 +207,6 @@ export default function Login() {
                                 }}
                             >
                                 {error}
-                            </div>
-                        )}
-
-                        {success && (
-                            <div 
-                                className="mb-4 p-3 rounded-xl text-sm text-center"
-                                style={{
-                                    background: 'rgba(34, 197, 94, 0.2)',
-                                    border: '1px solid rgba(34, 197, 94, 0.3)',
-                                    color: '#86efac',
-                                }}
-                            >
-                                {success}
                             </div>
                         )}
 
@@ -242,7 +221,7 @@ export default function Login() {
                             }}
                         >
                             {/* Button Shine */}
-                            <span 
+                            <span
                                 className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
                                 style={{
                                     background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
@@ -264,60 +243,46 @@ export default function Login() {
                         {/* Divider */}
                         <div className="flex items-center my-6">
                             <div className="flex-1 h-px bg-white/10"></div>
-                            <span className="px-4 text-sm text-white/40">or sign in without password</span>
+                            <span className="px-4 text-sm text-white/40">or</span>
                             <div className="flex-1 h-px bg-white/10"></div>
                         </div>
 
-                        {/* Magic Link Sign-In */}
-                        <div className="space-y-3">
-                            <input
-                                type="email"
-                                value={magicEmail}
-                                onChange={(e) => setMagicEmail(e.target.value)}
-                                className="w-full px-4 py-3.5 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
-                                style={{
-                                    background: 'rgba(255, 255, 255, 0.08)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                    backdropFilter: 'blur(10px)',
-                                }}
-                                placeholder="Enter email for magic link"
-                                disabled={magicLoading}
-                            />
-                            <button
-                                type="button"
-                                onClick={handleMagicLink}
-                                disabled={magicLoading}
-                                className="w-full py-3.5 rounded-xl font-semibold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
-                                style={{
-                                    background: 'rgba(255, 255, 255, 0.08)',
-                                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                                    backdropFilter: 'blur(10px)',
-                                    opacity: magicLoading ? 0.7 : 1,
-                                }}
-                            >
-                                {magicLoading ? (
-                                    <span className="flex items-center gap-2">
-                                        <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
-                                        Sending...
-                                    </span>
-                                ) : (
-                                    <>
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <rect x="2" y="4" width="20" height="16" rx="2"/>
-                                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-                                        </svg>
-                                        Send Magic Link
-                                    </>
-                                )}
-                            </button>
-                            <p className="text-xs text-white/40 text-center">We'll email you a sign-in link — no password needed</p>
-                        </div>
+                        {/* Google Sign-In */}
+                        <button
+                            type="button"
+                            onClick={handleGoogleSignIn}
+                            disabled={googleLoading}
+                            className="w-full py-3.5 rounded-xl font-semibold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                backdropFilter: 'blur(10px)',
+                                opacity: googleLoading ? 0.7 : 1,
+                            }}
+                        >
+                            {googleLoading ? (
+                                <span className="flex items-center gap-2">
+                                    <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
+                                    Connecting...
+                                </span>
+                            ) : (
+                                <>
+                                    <svg width="20" height="20" viewBox="0 0 48 48">
+                                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                                    </svg>
+                                    Sign in with Google
+                                </>
+                            )}
+                        </button>
                     </form>
 
                     <p className="text-center text-white/50 mt-6">
                         Don't have an account?{' '}
-                        <Link 
-                            to="/signup" 
+                        <Link
+                            to="/signup"
                             className="text-white/90 hover:text-white font-medium transition-colors"
                             style={{
                                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',

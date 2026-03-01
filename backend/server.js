@@ -26,6 +26,7 @@ import authRoutes from './routes/auth.js';
 import businessRoutes from './routes/business.js';
 import feedbackRoutes from './routes/feedback.js';
 import uploadRoutes from './routes/upload.js';
+import adminRoutes from './routes/admin.js';
 
 // Import middleware
 import { apiLimiter } from './middleware/rateLimit.js';
@@ -120,6 +121,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/business', businessRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling middleware — SECURITY: never leak stack traces
 app.use((err, req, res, next) => {

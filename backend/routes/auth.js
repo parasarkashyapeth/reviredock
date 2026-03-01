@@ -7,6 +7,9 @@ import { generateToken, generateRefreshToken, verifyRefreshToken, authenticate }
 import { authLimiter } from '../middleware/rateLimit.js';
 import { generateOTP, sendOTPEmail } from '../services/email.js';
 import { isValidEmail, isStrongPassword, truncate } from '../middleware/sanitize.js';
+import { OAuth2Client } from 'google-auth-library';
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const router = express.Router();
 
@@ -23,7 +26,7 @@ router.post('/send-otp', authLimiter, async (req, res) => {
         }
 
         // SECURITY: always respond the same way to prevent email enumeration
-        const genericResponse = { 
+        const genericResponse = {
             message: 'If this email is available, a verification code has been sent',
             expiresIn: 600
         };
@@ -70,7 +73,7 @@ router.post('/send-otp', authLimiter, async (req, res) => {
         // Send OTP email
         await sendOTPEmail(email, otp, businessName);
 
-        res.json({ 
+        res.json({
             message: 'Verification code sent to your email',
             expiresIn: 600 // 10 minutes in seconds
         });
@@ -129,7 +132,7 @@ router.post('/verify-otp', authLimiter, async (req, res) => {
             .update({ verified: true })
             .eq('id', otpRecord.id);
 
-        res.json({ 
+        res.json({
             verified: true,
             message: 'Email verified successfully'
         });
@@ -150,10 +153,10 @@ router.post('/signup', authLimiter, async (req, res) => {
         // Validation - review platforms are now optional
         const hasReviewPlatforms = Array.isArray(reviewPlatforms) && reviewPlatforms.length > 0;
         const hasLegacyUrl = googleReviewUrl && googleReviewUrl.trim();
-        
+
         // Password is required unless signing up with Google (googleId provided)
         const isGoogleSignup = !!googleId;
-        
+
         if (!email || !businessName || !category) {
             return res.status(400).json({ error: 'Email, business name, and category are required' });
         }
@@ -164,8 +167,8 @@ router.post('/signup', authLimiter, async (req, res) => {
                 return res.status(400).json({ error: 'Password is required' });
             }
             if (!isStrongPassword(password)) {
-                return res.status(400).json({ 
-                    error: 'Password must be at least 8 characters with uppercase, lowercase, and a number' 
+                return res.status(400).json({
+                    error: 'Password must be at least 8 characters with uppercase, lowercase, and a number'
                 });
             }
         }
@@ -275,7 +278,8 @@ router.post('/signup', authLimiter, async (req, res) => {
                 businessId,
                 businessName,
                 ownerName: ownerName || null,
-                profilePictureUrl: profilePictureUrl || null
+                profilePictureUrl: profilePictureUrl || null,
+                isAdmin: false
             }
         });
     } catch (error) {
@@ -327,7 +331,8 @@ router.post('/login', authLimiter, async (req, res) => {
                 businessId: user.business_id,
                 businessName: user.businesses.name,
                 ownerName: user.owner_name || null,
-                profilePictureUrl: user.profile_picture_url || null
+                profilePictureUrl: user.profile_picture_url || null,
+                isAdmin: user.is_admin || false
             }
         });
     } catch (error) {
@@ -338,19 +343,38 @@ router.post('/login', authLimiter, async (req, res) => {
 
 /**
  * POST /api/auth/google
- * Sign in or sign up via passwordless auth (Supabase Magic Link)
- * Accepts user data from Supabase Auth callback
+ * Sign in or sign up via native Google OAuth
+ * Accepts a Google ID token (credential) from Google Identity Services
  */
 router.post('/google', authLimiter, async (req, res) => {
     try {
-        const { email, name, picture, googleId, businessName, category, googleReviewUrl, reviewPlatforms } = req.body;
+        const { credential } = req.body;
 
-        if (!email) {
-            return res.status(400).json({ error: 'Email is required' });
+        if (!credential) {
+            return res.status(400).json({ error: 'Google credential is required' });
         }
 
-        const userName = name || email.split('@')[0];
-        const userPicture = picture || null;
+        // Verify the Google ID token
+        let ticket;
+        try {
+            ticket = await googleClient.verifyIdToken({
+                idToken: credential,
+                audience: process.env.GOOGLE_CLIENT_ID,
+            });
+        } catch (verifyError) {
+            console.error('Google token verification failed:', verifyError.message);
+            return res.status(401).json({ error: 'Invalid Google credential' });
+        }
+
+        const payload = ticket.getPayload();
+        const email = payload.email;
+        const name = payload.name || email.split('@')[0];
+        const picture = payload.picture || null;
+        const googleId = payload.sub;
+
+        if (!payload.email_verified) {
+            return res.status(400).json({ error: 'Google email not verified' });
+        }
 
         // Check if user already exists
         const { data: existingUser, error: findError } = await supabase
@@ -362,10 +386,10 @@ router.post('/google', authLimiter, async (req, res) => {
         if (existingUser) {
             // User exists - log them in
             // Update profile picture if changed
-            if (userPicture && userPicture !== existingUser.profile_picture_url) {
+            if (picture && picture !== existingUser.profile_picture_url) {
                 await supabase
                     .from('users')
-                    .update({ profile_picture_url: userPicture })
+                    .update({ profile_picture_url: picture })
                     .eq('id', existingUser.id);
             }
 
@@ -387,108 +411,30 @@ router.post('/google', authLimiter, async (req, res) => {
                     email: existingUser.email,
                     businessId: existingUser.business_id,
                     businessName: existingUser.businesses.name,
-                    ownerName: existingUser.owner_name || userName,
-                    profilePictureUrl: userPicture || existingUser.profile_picture_url
+                    ownerName: existingUser.owner_name || name,
+                    profilePictureUrl: picture || existingUser.profile_picture_url,
+                    isAdmin: existingUser.is_admin || false
                 },
                 isNewUser: false
             });
         }
 
-        // New user - check if we have required signup fields
-        if (!businessName) {
-            // Return that we need more info for signup
-            return res.json({
-                needsSignup: true,
-                email,
-                name: userName,
-                picture: userPicture,
-                googleId,
-                message: 'Please complete your business registration'
-            });
-        }
-
-        // Create new user with Google
-        const businessId = uuidv4();
-        const userId = uuidv4();
-
-        // Create business
-        const { error: businessError } = await supabase
-            .from('businesses')
-            .insert({
-                id: businessId,
-                name: businessName,
-                category: category || 'Other',
-                google_review_url: googleReviewUrl || '',
-                subscription_plan: 'free',
-                monthly_feedback_limit: 50,
-                monthly_feedback_count: 0
-            });
-
-        if (businessError) {
-            console.error('Business creation error:', businessError);
-            return res.status(500).json({ error: 'Failed to create business' });
-        }
-
-        // Create user (no password for Google users)
-        const { error: userError } = await supabase
-            .from('users')
-            .insert({
-                id: userId,
-                email: email.toLowerCase(),
-                password_hash: null,
-                business_id: businessId,
-                owner_name: userName,
-                profile_picture_url: userPicture,
-                google_id: googleId || null
-            });
-
-        if (userError) {
-            console.error('User creation error:', userError);
-            await supabase.from('businesses').delete().eq('id', businessId);
-            return res.status(500).json({ error: 'Failed to create user' });
-        }
-
-        // Insert review platforms if provided
-        if (Array.isArray(reviewPlatforms) && reviewPlatforms.length > 0) {
-            const platformsToInsert = reviewPlatforms.map((p, idx) => ({
-                business_id: businessId,
-                platform_name: p.platform || 'custom',
-                platform_label: p.label || p.platform || 'Review Link',
-                url: p.url,
-                is_primary: p.isPrimary || idx === 0,
-                is_active: true
-            }));
-
-            const { error: platformError } = await supabase
-                .from('review_platforms')
-                .insert(platformsToInsert);
-
-            if (platformError) {
-                console.error('Review platforms insert error:', platformError);
-            }
-        }
-
-        // Generate JWT
-        const token = generateToken({ userId, businessId });
-
-        res.status(201).json({
-            message: 'Account created successfully',
-            token,
-            user: {
-                id: userId,
-                email: email.toLowerCase(),
-                businessId,
-                businessName,
-                ownerName: userName,
-                profilePictureUrl: userPicture
-            },
-            isNewUser: true
+        // New user — needs to complete signup
+        // Return their Google profile data so the frontend can prefill the signup form
+        return res.json({
+            needsSignup: true,
+            email,
+            name,
+            picture,
+            googleId,
+            message: 'Please complete your business registration'
         });
     } catch (error) {
         console.error('Google auth error:', error);
         res.status(500).json({ error: 'Google authentication failed' });
     }
 });
+
 
 /**
  * GET /api/auth/me
@@ -514,7 +460,8 @@ router.get('/me', authenticate, async (req, res) => {
             businessId: user.business_id,
             businessName: user.businesses.name,
             ownerName: user.owner_name || null,
-            profilePictureUrl: user.profile_picture_url || null
+            profilePictureUrl: user.profile_picture_url || null,
+            isAdmin: user.is_admin || false
         });
     } catch (error) {
         console.error('Get user error:', error);
@@ -544,7 +491,7 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
 
         if (userError || !user) {
             // Don't reveal if email exists or not for security
-            return res.json({ 
+            return res.json({
                 message: 'If an account with that email exists, a password reset link has been generated.',
                 // In production, remove the token from response and send via email
             });
@@ -578,7 +525,7 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
 
         // SECURITY: Never return the token in response — send via email only
         // TODO: Wire up sendPasswordResetEmail(email, resetToken) when SMTP is configured
-        res.json({ 
+        res.json({
             message: 'If an account with that email exists, a password reset link has been sent.',
         });
     } catch (error) {
@@ -600,8 +547,8 @@ router.post('/reset-password', authLimiter, async (req, res) => {
         }
 
         if (!isStrongPassword(newPassword)) {
-            return res.status(400).json({ 
-                error: 'Password must be at least 8 characters with uppercase, lowercase, and a number' 
+            return res.status(400).json({
+                error: 'Password must be at least 8 characters with uppercase, lowercase, and a number'
             });
         }
 
@@ -706,8 +653,8 @@ router.post('/change-password', authenticate, async (req, res) => {
         }
 
         if (!isStrongPassword(newPassword)) {
-            return res.status(400).json({ 
-                error: 'New password must be at least 8 characters with uppercase, lowercase, and a number' 
+            return res.status(400).json({
+                error: 'New password must be at least 8 characters with uppercase, lowercase, and a number'
             });
         }
 

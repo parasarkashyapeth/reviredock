@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import API_URL from '../config/api'
-import MeteorShower from './MeteorShower'
+// MeteorShower removed
 import FlyingButterfly from './FlyingButterfly'
 import CrackEffect from './CrackEffect'
 import { IconDashboard, IconChart, IconQR, IconDiamond, IconSettings } from './Icons'
@@ -220,27 +220,30 @@ export default function Layout({ children }) {
         return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="#8b5cf6" width="100" height="100"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="40" font-family="Arial">${initial}</text></svg>`)}`
     }
 
-    const navItems = useMemo(() => [
-        { path: '/dashboard', label: 'Dashboard', Icon: IconDashboard, badge: newFeedbackCount },
-        { path: '/analytics', label: 'Analytics', Icon: IconChart },
-        { path: '/qr-code', label: 'QR Code', Icon: IconQR },
-        { path: '/pricing', label: 'Pricing', Icon: IconDiamond },
-        { path: '/settings', label: 'Settings', Icon: IconSettings },
-    ], [newFeedbackCount])
+    const navItems = useMemo(() => {
+        const items = [
+            { path: '/dashboard', label: 'Dashboard', Icon: IconDashboard, badge: newFeedbackCount },
+            { path: '/analytics', label: 'Analytics', Icon: IconChart },
+            { path: '/qr-code', label: 'QR Code', Icon: IconQR },
+            { path: '/pricing', label: 'Pricing', Icon: IconDiamond },
+            { path: '/settings', label: 'Settings', Icon: IconSettings },
+        ]
+        if (user?.isAdmin) {
+            items.push({ path: '/admin', label: 'Admin', Icon: () => <span style={{ fontSize: 16 }}>🛡️</span> })
+        }
+        return items
+    }, [newFeedbackCount, user?.isAdmin])
 
     return (
         <div className="min-h-screen bg-black relative overflow-hidden">
-            {/* Meteor Shower Background */}
-            <MeteorShower />
-
             {/* Flying Butterflies */}
             <FlyingButterfly />
 
             {/* Crack Effect on Button Click */}
             <CrackEffect />
-            
+
             {/* Top Navigation - Glass Effect */}
-            <nav 
+            <nav
                 className="fixed top-0 left-0 right-0 z-50"
                 style={{
                     background: 'rgba(10, 20, 40, 0.6)',
@@ -252,7 +255,7 @@ export default function Layout({ children }) {
                 }}
             >
                 {/* Animated shine effect across navbar */}
-                <div 
+                <div
                     className="absolute top-0 h-full w-1/3 pointer-events-none"
                     style={{
                         background: 'linear-gradient(90deg, transparent, rgba(100, 200, 255, 0.08), transparent)',
@@ -261,7 +264,7 @@ export default function Layout({ children }) {
                     }}
                 />
                 {/* Bottom glow line */}
-                <div 
+                <div
                     className="absolute bottom-0 left-0 right-0 h-[1px] pointer-events-none"
                     style={{
                         background: 'linear-gradient(90deg, transparent, rgba(100, 200, 255, 0.4), rgba(150, 220, 255, 0.4), transparent)',
@@ -272,7 +275,7 @@ export default function Layout({ children }) {
                         {/* Logo */}
                         <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 20 }}>
                             {/* Anchor icon */}
-                            <span 
+                            <span
                                 className="text-2xl"
                                 style={{
                                     filter: 'drop-shadow(0 0 8px rgba(139, 92, 246, 0.6))',
@@ -282,7 +285,7 @@ export default function Layout({ children }) {
                             >
                                 ⚓
                             </span>
-                            <span 
+                            <span
                                 className="text-2xl font-bold cursor-pointer relative"
                                 style={{
                                     background: 'linear-gradient(135deg, #a78bfa 0%, #c084fc 50%, #e879f9 100%)',
@@ -321,7 +324,7 @@ export default function Layout({ children }) {
                                     <span className="font-semibold tracking-wide relative" style={{ letterSpacing: '0.02em' }}>
                                         {item.label}
                                         {item.badge > 0 && (
-                                            <span 
+                                            <span
                                                 className="absolute -top-2 -right-5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white animate-pulse"
                                                 style={{
                                                     background: 'linear-gradient(135deg, #ef4444, #f87171)',
@@ -379,10 +382,10 @@ export default function Layout({ children }) {
                                     <span className="text-sm text-white/90 font-semibold group-hover:text-white transition-colors duration-300">
                                         {user?.ownerName || user?.businessName}
                                     </span>
-                                    <svg 
-                                        className={`w-4 h-4 text-white/60 transition-all duration-300 group-hover:text-white/80 ${showProfileDropdown ? 'rotate-180' : ''}`} 
-                                        fill="none" 
-                                        viewBox="0 0 24 24" 
+                                    <svg
+                                        className={`w-4 h-4 text-white/60 transition-all duration-300 group-hover:text-white/80 ${showProfileDropdown ? 'rotate-180' : ''}`}
+                                        fill="none"
+                                        viewBox="0 0 24 24"
                                         stroke="currentColor"
                                     >
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -391,7 +394,7 @@ export default function Layout({ children }) {
 
                                 {/* Profile Dropdown */}
                                 {showProfileDropdown && (
-                                    <div 
+                                    <div
                                         className="absolute right-0 mt-2 w-56 rounded-xl"
                                         style={{
                                             zIndex: 9999,
@@ -404,7 +407,7 @@ export default function Layout({ children }) {
                                         }}
                                     >
                                         {/* Profile Info */}
-                                        <div 
+                                        <div
                                             className="px-4 py-3"
                                             style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}
                                         >
@@ -465,8 +468,8 @@ export default function Layout({ children }) {
                 </div>
 
                 {/* Mobile Navigation */}
-                <div 
-                    id="mobile-menu" 
+                <div
+                    id="mobile-menu"
                     className="hidden md:hidden"
                     style={{
                         borderTop: '1px solid rgba(255, 255, 255, 0.1)',
@@ -476,7 +479,7 @@ export default function Layout({ children }) {
                 >
                     <div className="px-4 py-3 space-y-2">
                         {/* Mobile Profile Section */}
-                        <div 
+                        <div
                             className="flex items-center gap-3 px-4 py-3 rounded-xl mb-3"
                             style={{
                                 background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%)',
@@ -555,7 +558,7 @@ export default function Layout({ children }) {
             </main>
 
             {/* Footer */}
-            <footer 
+            <footer
                 className="relative z-10 border-t overflow-hidden"
                 style={{
                     background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
@@ -565,7 +568,7 @@ export default function Layout({ children }) {
                 }}
             >
                 {/* Animated wave line across footer top */}
-                <div 
+                <div
                     className="absolute top-0 left-0 right-0 h-px"
                     style={{
                         background: 'linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.6), rgba(168, 85, 247, 0.6), transparent)',
@@ -596,7 +599,7 @@ export default function Layout({ children }) {
                                 >
                                     ⚓
                                 </span>
-                                <span 
+                                <span
                                     className="text-xl font-bold"
                                     style={{
                                         background: 'linear-gradient(135deg, #a78bfa 0%, #c084fc 35%, #f472b6 65%, #fb7185 100%)',
@@ -609,7 +612,7 @@ export default function Layout({ children }) {
                                     ReviewDock
                                 </span>
                             </div>
-                            <p 
+                            <p
                                 className="text-white/80 text-sm text-center md:text-left"
                                 style={{
                                     textShadow: '0 0 8px rgba(255,255,255,0.2), 0 0 25px rgba(255,255,255,0.08)',
@@ -634,7 +637,7 @@ export default function Layout({ children }) {
 
                         {/* Copyright */}
                         <div className="text-center md:text-right">
-                            <p 
+                            <p
                                 className="text-white/70 text-xs"
                                 style={{
                                     textShadow: '0 0 6px rgba(255,255,255,0.15), 0 0 20px rgba(255,255,255,0.06)',
@@ -642,7 +645,7 @@ export default function Layout({ children }) {
                             >
                                 © {new Date().getFullYear()} ReviewDock. All rights reserved.
                             </p>
-                            <p 
+                            <p
                                 className="text-white/60 text-xs mt-1"
                                 style={{
                                     textShadow: '0 0 8px rgba(255,255,255,0.2), 0 0 25px rgba(255,255,255,0.08)',
