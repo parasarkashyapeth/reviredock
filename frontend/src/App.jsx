@@ -1,7 +1,66 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, Component } from 'react'
 import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './hooks/useAuth'
+
+// Error Boundary — prevents white screen on lazy-load failures or render errors
+class ErrorBoundary extends Component {
+    constructor(props) {
+        super(props)
+        this.state = { hasError: false, error: null }
+    }
+
+    static getDerivedStateFromError(error) {
+        return { hasError: true, error }
+    }
+
+    componentDidCatch(error, errorInfo) {
+        console.error('App ErrorBoundary caught:', error, errorInfo)
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-black">
+                    <div style={{
+                        textAlign: 'center',
+                        padding: '40px',
+                        background: 'rgba(30, 30, 40, 0.95)',
+                        borderRadius: '16px',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        maxWidth: '420px'
+                    }}>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+                        <h2 style={{ color: '#fff', fontSize: '20px', marginBottom: '8px' }}>Something went wrong</h2>
+                        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', marginBottom: '24px' }}>
+                            The page failed to load. This could be a network issue.
+                        </p>
+                        <button
+                            onClick={() => {
+                                this.setState({ hasError: false, error: null })
+                                window.location.reload()
+                            }}
+                            style={{
+                                padding: '10px 24px',
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            Reload Page
+                        </button>
+                    </div>
+                </div>
+            )
+        }
+
+        return this.props.children
+    }
+}
 
 // Loading spinner component
 function LoadingSpinner() {
@@ -57,7 +116,7 @@ function ProtectedRoute({ children }) {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center bg-black">
                 <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent"></div>
             </div>
         )
@@ -76,7 +135,7 @@ function PublicRoute({ children }) {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center bg-black">
                 <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent"></div>
             </div>
         )
@@ -177,13 +236,15 @@ function AppRoutes() {
 
 function App() {
     return (
-        <Router>
-            <AuthProvider>
-                <Suspense fallback={<LoadingSpinner />}>
-                    <AppRoutes />
-                </Suspense>
-            </AuthProvider>
-        </Router>
+        <ErrorBoundary>
+            <Router>
+                <AuthProvider>
+                    <Suspense fallback={<LoadingSpinner />}>
+                        <AppRoutes />
+                    </Suspense>
+                </AuthProvider>
+            </Router>
+        </ErrorBoundary>
     )
 }
 
