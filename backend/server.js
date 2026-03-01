@@ -71,7 +71,8 @@ const allowedOrigins = [
     'http://localhost:8000',
     'https://bussiness-feedback-ap8e.vercel.app',
     'http://localhost:8001',
-    'https://review-dock.vercel.app'
+    'https://review-dock.vercel.app',
+    'https://reviewdock.100xsolutions.in'
 ].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
 
 app.use(cors({
