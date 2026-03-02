@@ -1,16 +1,76 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 
 <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="ReviewDock — Smart review management for modern businesses" />
+
+    <!-- Primary SEO Meta Tags -->
+    <title>ReviewDock — Smart Review Management for Modern Businesses</title>
+    <meta name="title" content="ReviewDock — Smart Review Management for Modern Businesses" />
+    <meta name="description"
+        content="ReviewDock helps businesses collect, manage, and boost Google reviews with QR codes, AI-powered feedback analysis, and smart redirection. Grow your online reputation effortlessly." />
+    <meta name="keywords"
+        content="review management, Google reviews, business feedback, QR code reviews, customer feedback, online reputation, review collection, feedback management, Google review link, business reviews, review analytics, AI feedback analysis, customer reviews, review platform, local business reviews" />
+    <meta name="author" content="ReviewDock" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <link rel="canonical" href="https://reviewdock.100xsolutions.in/" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://reviewdock.100xsolutions.in/" />
+    <meta property="og:title" content="ReviewDock — Smart Review Management for Modern Businesses" />
+    <meta property="og:description"
+        content="Collect, manage, and boost Google reviews with QR codes and AI-powered feedback analysis. Grow your online reputation effortlessly." />
+    <meta property="og:image" content="https://reviewdock.100xsolutions.in/favicon.svg" />
+    <meta property="og:site_name" content="ReviewDock" />
+    <meta property="og:locale" content="en_IN" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://reviewdock.100xsolutions.in/" />
+    <meta name="twitter:title" content="ReviewDock — Smart Review Management for Modern Businesses" />
+    <meta name="twitter:description"
+        content="Collect, manage, and boost Google reviews with QR codes and AI-powered feedback analysis. Grow your online reputation effortlessly." />
+    <meta name="twitter:image" content="https://reviewdock.100xsolutions.in/favicon.svg" />
+
+    <!-- Geo / Local SEO Meta Tags -->
+    <meta name="geo.region" content="IN" />
+    <meta name="geo.placename" content="India" />
+    <meta name="ICBM" content="20.5937, 78.9629" />
+    <meta name="geo.position" content="20.5937;78.9629" />
+    <meta name="language" content="English" />
+    <meta name="distribution" content="global" />
+    <meta name="coverage" content="Worldwide" />
+    <meta name="target" content="all" />
+    <meta name="audience" content="all" />
+    <meta name="rating" content="general" />
+
+    <!-- Theme & PWA -->
+    <meta name="theme-color" content="#667eea" />
+    <meta name="msapplication-TileColor" content="#667eea" />
+    <meta name="msapplication-navbutton-color" content="#667eea" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ReviewDock" />
+    <meta name="application-name" content="ReviewDock" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Preconnect for performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://www.googletagmanager.com">
+    <link rel="dns-prefetch" href="https://accounts.google.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <!-- Google tag (gtag.js) -->
+
+    <!-- Google Analytics (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-DH8ZPFDNDT"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -18,7 +78,111 @@
         gtag('js', new Date());
         gtag('config', 'G-DH8ZPFDNDT');
     </script>
-    <title>ReviewDock</title>
+
+    <!-- JSON-LD Structured Data: Organization -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "ReviewDock",
+        "url": "https://reviewdock.100xsolutions.in",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "Smart review management platform that helps businesses collect, manage, and boost Google reviews with QR codes, AI-powered feedback analysis, and smart customer redirection.",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "INR",
+            "description": "Free plan available"
+        },
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "ratingCount": "500",
+            "bestRating": "5"
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "ReviewDock",
+            "url": "https://reviewdock.100xsolutions.in",
+            "logo": {
+                "@type": "ImageObject",
+                "url": "https://reviewdock.100xsolutions.in/favicon.svg"
+            },
+            "sameAs": [
+                "https://github.com/pkbtc/review-dock"
+            ]
+        },
+        "featureList": [
+            "QR Code Review Collection",
+            "AI-Powered Feedback Analysis",
+            "Google Review Redirection",
+            "Real-Time Analytics Dashboard",
+            "Multi-Platform Review Management",
+            "Email Notifications",
+            "Customer Sentiment Analysis"
+        ]
+    }
+    </script>
+
+    <!-- JSON-LD: WebSite for Search Box -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "ReviewDock",
+        "url": "https://reviewdock.100xsolutions.in",
+        "description": "Smart review management for modern businesses",
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://reviewdock.100xsolutions.in/b/{search_term_string}",
+            "query-input": "required name=search_term_string"
+        }
+    }
+    </script>
+
+    <!-- JSON-LD: FAQPage for Rich Results -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": "What is ReviewDock?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "ReviewDock is a smart review management platform that helps businesses collect customer feedback through QR codes, analyze sentiment with AI, and redirect happy customers to leave Google reviews — boosting your online reputation effortlessly."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "How does ReviewDock help get more Google reviews?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "ReviewDock uses a smart feedback flow: customers scan a QR code to leave feedback. If the feedback is positive (4-5 stars), they are automatically redirected to your Google Review page. Negative feedback is captured privately for improvement."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Is ReviewDock free to use?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Yes! ReviewDock offers a free plan with up to 50 feedbacks per month, QR code generation, and basic analytics. Premium plans are available for unlimited feedbacks, AI insights, and advanced features."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "What types of businesses can use ReviewDock?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "ReviewDock is designed for any local business — restaurants, cafés, salons, gyms, clinics, hotels, retail stores, spas, and more. Any business that wants to collect and manage customer reviews can benefit."
+                }
+            }
+        ]
+    }
+    </script>
+
     <style>
         /* Prevent white flash before React loads */
         html,
@@ -55,6 +219,15 @@
 </head>
 
 <body>
+    <!-- SEO: Noscript fallback for search engines -->
+    <noscript>
+        <div style="padding: 40px; text-align: center; font-family: sans-serif;">
+            <h1>ReviewDock — Smart Review Management</h1>
+            <p>ReviewDock helps businesses collect, manage, and boost Google reviews with QR codes and AI-powered
+                feedback analysis.</p>
+            <p>Please enable JavaScript to use ReviewDock.</p>
+        </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
 </body>

@@ -1,16 +1,28 @@
 {
-    "name": "ReviewDock",
+    "name": "ReviewDock — Smart Review Management",
     "short_name": "ReviewDock",
-    "description": "Smart review management for modern businesses",
+    "description": "Collect, manage, and boost Google reviews with QR codes and AI-powered feedback analysis. The smartest way to grow your online reputation.",
     "start_url": "/",
+    "scope": "/",
     "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#6366f1",
+    "orientation": "portrait-primary",
+    "background_color": "#000000",
+    "theme_color": "#667eea",
+    "lang": "en",
+    "dir": "ltr",
+    "categories": [
+        "business",
+        "productivity",
+        "utilities"
+    ],
     "icons": [
         {
             "src": "/favicon.svg",
             "sizes": "any",
-            "type": "image/svg+xml"
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
         }
-    ]
+    ],
+    "screenshots": [],
+    "prefer_related_applications": false
 }

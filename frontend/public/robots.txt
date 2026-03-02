@@ -1,0 +1,28 @@
+# ReviewDock Robots.txt
+# https://reviewdock.100xsolutions.in
+
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /signup
+Allow: /b/
+
+# Disallow admin/private pages
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /admin
+Disallow: /qr-code
+Disallow: /qr
+Disallow: /analytics
+Disallow: /profile-setup
+Disallow: /welcome
+Disallow: /pricing
+Disallow: /auth/
+Disallow: /forgot-password
+Disallow: /reset-password
+
+# Crawl-delay for politeness
+Crawl-delay: 1
+
+# Sitemap
+Sitemap: https://reviewdock.100xsolutions.in/sitemap.xml
