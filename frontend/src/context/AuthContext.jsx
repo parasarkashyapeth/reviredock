@@ -141,9 +141,10 @@ export function AuthProvider({ children }) {
         if (el) el.remove()
     }
 
-    // Initialize Google One Tap / GIS and return a promise that resolves with the credential
+    // Sign in with Google by rendering a hidden button and auto-clicking it.
+    // This directly opens the Google account chooser without any intermediate UI.
     const signInWithGoogle = () => {
-        // Always clean up any leftover overlay from a previous attempt
+        // Always clean up any leftover elements from a previous attempt
         removeFallbackOverlay()
 
         return new Promise((resolve, reject) => {
@@ -157,11 +158,13 @@ export function AuthProvider({ children }) {
                 return
             }
 
+            // Cancel any pending One Tap prompts
+            window.google.accounts.id.cancel()
+
             window.google.accounts.id.initialize({
                 client_id: GOOGLE_CLIENT_ID,
                 callback: async (response) => {
                     try {
-                        // Clean up the overlay BEFORE resolving
                         removeFallbackOverlay()
                         const result = await googleAuth(response.credential)
                         resolve(result)
@@ -172,73 +175,40 @@ export function AuthProvider({ children }) {
                 },
             })
 
-            // Use the popup flow
-            window.google.accounts.id.prompt((notification) => {
-                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                    // Fallback: render a Google Sign-In button in a temporary container
-                    const overlay = document.createElement('div')
-                    overlay.style.position = 'fixed'
-                    overlay.style.top = '0'
-                    overlay.style.left = '0'
-                    overlay.style.width = '100%'
-                    overlay.style.height = '100%'
-                    overlay.style.zIndex = '99999'
-                    overlay.style.background = 'rgba(0,0,0,0.6)'
-                    overlay.style.display = 'flex'
-                    overlay.style.alignItems = 'center'
-                    overlay.style.justifyContent = 'center'
-                    overlay.id = 'google-signin-fallback'
+            // Create a hidden container, render the Google button, and auto-click it
+            const hiddenContainer = document.createElement('div')
+            hiddenContainer.id = 'google-signin-fallback'
+            hiddenContainer.style.position = 'fixed'
+            hiddenContainer.style.top = '-9999px'
+            hiddenContainer.style.left = '-9999px'
+            hiddenContainer.style.opacity = '0'
+            hiddenContainer.style.pointerEvents = 'none'
+            document.body.appendChild(hiddenContainer)
 
-                    // Click on backdrop to dismiss
-                    overlay.addEventListener('click', (e) => {
-                        if (e.target === overlay) {
-                            removeFallbackOverlay()
-                        }
-                    })
-
-                    // Inner card
-                    const card = document.createElement('div')
-                    card.style.background = 'rgba(20, 20, 30, 0.95)'
-                    card.style.padding = '32px'
-                    card.style.borderRadius = '16px'
-                    card.style.border = '1px solid rgba(255,255,255,0.1)'
-                    card.style.position = 'relative'
-                    card.style.minWidth = '320px'
-                    card.style.textAlign = 'center'
-
-                    // Close button
-                    const closeBtn = document.createElement('button')
-                    closeBtn.textContent = '✕'
-                    closeBtn.style.position = 'absolute'
-                    closeBtn.style.top = '8px'
-                    closeBtn.style.right = '12px'
-                    closeBtn.style.background = 'none'
-                    closeBtn.style.border = 'none'
-                    closeBtn.style.color = 'rgba(255,255,255,0.5)'
-                    closeBtn.style.fontSize = '18px'
-                    closeBtn.style.cursor = 'pointer'
-                    closeBtn.addEventListener('click', removeFallbackOverlay)
-                    card.appendChild(closeBtn)
-
-                    // Button container
-                    const btnContainer = document.createElement('div')
-                    btnContainer.style.marginTop = '8px'
-                    card.appendChild(btnContainer)
-
-                    overlay.appendChild(card)
-                    document.body.appendChild(overlay)
-
-                    window.google.accounts.id.renderButton(btnContainer, {
-                        theme: 'filled_black',
-                        size: 'large',
-                        width: 300,
-                        text: 'continue_with',
-                    })
-
-                    // Auto-remove after 30s if user doesn't click
-                    setTimeout(removeFallbackOverlay, 30000)
-                }
+            window.google.accounts.id.renderButton(hiddenContainer, {
+                theme: 'filled_black',
+                size: 'large',
+                width: 300,
+                text: 'continue_with',
             })
+
+            // Wait briefly for the button to render, then auto-click it
+            setTimeout(() => {
+                const googleBtn = hiddenContainer.querySelector('[role="button"]')
+                    || hiddenContainer.querySelector('div[aria-labelledby]')
+                    || hiddenContainer.querySelector('iframe')
+
+                if (googleBtn) {
+                    googleBtn.click()
+                } else {
+                    // If we can't find a clickable element, click the first child
+                    const firstChild = hiddenContainer.firstElementChild
+                    if (firstChild) firstChild.click()
+                }
+
+                // Clean up hidden container after a delay
+                setTimeout(removeFallbackOverlay, 60000)
+            }, 300)
         })
     }
 
