@@ -92,6 +92,16 @@ app.use(cors({
     maxAge: 600, // Preflight cache 10 min
 }));
 
+// ── Razorpay Webhook: Capture raw body BEFORE json parsing ──
+// The webhook signature is verified against the raw request body.
+// We also skip sanitization and rate limiting for this route (called by Razorpay servers).
+app.use('/api/payment/webhook', express.json({
+    limit: '1mb',
+    verify: (req, _res, buf) => {
+        req.rawBody = buf.toString('utf8');
+    },
+}));
+
 // ── SECURITY LAYER 4: Body parsing with strict limits ──
 app.use(express.json({ limit: '5mb' })); // Reduced from 10mb
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));

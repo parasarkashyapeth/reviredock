@@ -20,22 +20,10 @@ export default function Pricing() {
     const [usage, setUsage] = useState({ used: 0, limit: 50 })
     const [loading, setLoading] = useState(true)
     const [paying, setPaying] = useState(false)
-    const [paymentSuccess, setPaymentSuccess] = useState(null)
 
     useEffect(() => {
         fetchPlanInfo()
-        loadRazorpayScript()
     }, [])
-
-    // Dynamically load Razorpay checkout script
-    const loadRazorpayScript = () => {
-        if (document.getElementById('razorpay-script')) return
-        const script = document.createElement('script')
-        script.id = 'razorpay-script'
-        script.src = 'https://checkout.razorpay.com/v1/checkout.js'
-        script.async = true
-        document.head.appendChild(script)
-    }
 
     const fetchPlanInfo = async () => {
         try {
@@ -114,13 +102,12 @@ export default function Pricing() {
         if (planId === 'free' || paying) return
 
         setPaying(true)
-        setPaymentSuccess(null)
 
         try {
             const token = getToken()
 
-            // 1. Create order on backend
-            const orderRes = await fetch(`${API_URL}/api/payment/create-order`, {
+            // 1. Create a Razorpay Payment Link on the backend
+            const res = await fetch(`${API_URL}/api/payment/create-payment-link`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -129,82 +116,18 @@ export default function Pricing() {
                 body: JSON.stringify({ planId }),
             })
 
-            if (!orderRes.ok) {
-                const err = await orderRes.json()
-                throw new Error(err.error || 'Failed to create order')
+            if (!res.ok) {
+                const err = await res.json()
+                throw new Error(err.error || 'Failed to create payment link')
             }
 
-            const orderData = await orderRes.json()
+            const data = await res.json()
 
-            // 2. Open Razorpay checkout
-            if (!window.Razorpay) {
-                throw new Error('Payment gateway is loading. Please try again.')
-            }
+            // 2. Store the reference ID for the callback page to use
+            localStorage.setItem('rdock_payment_ref', data.referenceId)
 
-            const options = {
-                key: orderData.key,
-                amount: orderData.amount,
-                currency: orderData.currency,
-                name: 'ReviewDock',
-                description: `${orderData.planName} Subscription`,
-                order_id: orderData.orderId,
-                handler: async function (response) {
-                    // 3. Verify payment on backend
-                    try {
-                        const verifyRes = await fetch(`${API_URL}/api/payment/verify`, {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${token}`,
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature,
-                            }),
-                        })
-
-                        const verifyData = await verifyRes.json()
-
-                        if (verifyRes.ok) {
-                            setPaymentSuccess({
-                                plan: verifyData.planName,
-                                expiresAt: verifyData.expiresAt,
-                            })
-                            setCurrentPlan('paid')
-                            setUsage(prev => ({ ...prev, limit: 999999 }))
-                        } else {
-                            throw new Error(verifyData.error || 'Verification failed')
-                        }
-                    } catch (err) {
-                        console.error('Payment verification error:', err)
-                        alert('Payment was received but verification failed. Please contact support.')
-                    } finally {
-                        setPaying(false)
-                    }
-                },
-                prefill: {
-                    email: user.email || '',
-                    contact: '',
-                },
-                theme: {
-                    color: '#667eea',
-                    backdrop_color: 'rgba(0, 0, 0, 0.7)',
-                },
-                modal: {
-                    ondismiss: function () {
-                        setPaying(false)
-                    }
-                },
-            }
-
-            const rzp = new window.Razorpay(options)
-            rzp.on('payment.failed', function (response) {
-                console.error('Payment failed:', response.error)
-                alert(`Payment failed: ${response.error.description}`)
-                setPaying(false)
-            })
-            rzp.open()
+            // 3. Redirect to Razorpay's hosted payment page (no domain whitelisting needed!)
+            window.location.href = data.paymentLinkUrl
 
         } catch (error) {
             console.error('Upgrade error:', error)
@@ -230,31 +153,6 @@ export default function Pricing() {
                     </h1>
                     <p className="text-white/60">Simple, transparent pricing for your business</p>
                 </div>
-
-                {/* Payment Success Banner */}
-                {paymentSuccess && (
-                    <div
-                        className="p-6 mb-8 text-center"
-                        style={{
-                            ...glassCard,
-                            background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.2) 100%)',
-                            border: '1px solid rgba(34, 197, 94, 0.4)',
-                        }}
-                    >
-                        <div style={{ fontSize: '48px', marginBottom: '8px' }}>🎉</div>
-                        <h3 className="text-xl font-bold text-white mb-2">
-                            Welcome to {paymentSuccess.plan}!
-                        </h3>
-                        <p className="text-white/70">
-                            Your plan is now active. Enjoy unlimited feedbacks and premium features!
-                        </p>
-                        {paymentSuccess.expiresAt && (
-                            <p className="text-sm text-white/50 mt-2">
-                                Valid until {new Date(paymentSuccess.expiresAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}
-                            </p>
-                        )}
-                    </div>
-                )}
 
                 {/* Current Usage */}
                 {!loading && currentPlan === 'free' && (
@@ -417,7 +315,7 @@ export default function Pricing() {
                                 {paying ? (
                                     <span className="flex items-center justify-center gap-2">
                                         <span className="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
-                                        Processing...
+                                        Redirecting...
                                     </span>
                                 ) : plan.buttonText}
                             </button>

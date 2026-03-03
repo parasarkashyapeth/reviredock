@@ -100,6 +100,7 @@ const Pricing = lazy(() => import('./pages/Pricing'))
 const Feedback = lazy(() => import('./pages/Feedback'))
 const Analytics = lazy(() => import('./pages/Analytics'))
 const AdminPanel = lazy(() => import('./pages/AdminPanel'))
+const PaymentCallback = lazy(() => import('./pages/PaymentCallback'))
 
 // Regular imports for lighter pages
 import Login from './pages/Login'
@@ -214,6 +215,11 @@ function AppRoutes() {
             <Route path="/pricing" element={
                 <ProtectedRoute>
                     <Pricing />
+                </ProtectedRoute>
+            } />
+            <Route path="/payment/callback" element={
+                <ProtectedRoute>
+                    <PaymentCallback />
                 </ProtectedRoute>
             } />
             <Route path="/analytics" element={
