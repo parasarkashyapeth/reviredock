@@ -3,7 +3,6 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import API_URL from '../config/api'
 // MeteorShower removed
-import FlyingButterfly from './FlyingButterfly'
 import CrackEffect from './CrackEffect'
 import { IconDashboard, IconChart, IconQR, IconDiamond, IconSettings } from './Icons'
 
@@ -236,9 +235,6 @@ export default function Layout({ children }) {
 
     return (
         <div className="min-h-screen bg-black relative overflow-hidden">
-            {/* Flying Butterflies */}
-            <FlyingButterfly />
-
             {/* Crack Effect on Button Click */}
             <CrackEffect />
 
