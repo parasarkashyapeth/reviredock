@@ -3,7 +3,6 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import API_URL from '../config/api'
 // MeteorShower removed
-import CrackEffect from './CrackEffect'
 import { IconDashboard, IconChart, IconQR, IconDiamond, IconSettings } from './Icons'
 
 // Inject layout animations
@@ -235,9 +234,6 @@ export default function Layout({ children }) {
 
     return (
         <div className="min-h-screen bg-black relative overflow-hidden">
-            {/* Crack Effect on Button Click */}
-            <CrackEffect />
-
             {/* Top Navigation - Glass Effect */}
             <nav
                 className="fixed top-0 left-0 right-0 z-50"
