@@ -101,6 +101,7 @@ const Feedback = lazy(() => import('./pages/Feedback'))
 const Analytics = lazy(() => import('./pages/Analytics'))
 const AdminPanel = lazy(() => import('./pages/AdminPanel'))
 const PaymentCallback = lazy(() => import('./pages/PaymentCallback'))
+const LandingPage = lazy(() => import('./pages/LandingPage'))
 
 // Regular imports for lighter pages
 import Login from './pages/Login'
@@ -233,8 +234,8 @@ function AppRoutes() {
                 </ProtectedRoute>
             } />
 
-            {/* Default redirect */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            {/* Landing Page */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
     )
