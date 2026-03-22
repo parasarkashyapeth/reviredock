@@ -328,6 +328,99 @@ export default function LandingPage() {
                 </div>
             </section>
 
+            {/* User Reviews Section */}
+            <section className="relative px-4 py-16 md:py-24 border-t border-white/5">
+                <div className="max-w-6xl mx-auto">
+                    <Reveal>
+                        <div className="text-center mb-10 sm:mb-12 md:mb-16">
+                            <h2 className="text-2xl sm:text-3xl md:text-5xl font-extrabold mb-4">
+                                Loved by <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Modern Businesses</span>
+                            </h2>
+                            <p className="text-gray-400 text-sm sm:text-base md:text-xl max-w-2xl mx-auto px-2">
+                                See how Review Dock's smart features are helping real companies grow their online reputation and revenue.
+                            </p>
+                        </div>
+                    </Reveal>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+                        {/* Review 1 */}
+                        <Reveal delay={0.12} direction="up">
+                            <div className="glass-card p-6 md:p-8 flex flex-col h-full hover:border-[#8b5cf6]/30 transition-all duration-300 hover:-translate-y-1">
+                                <div className="flex items-center gap-1 mb-5">
+                                    {[...Array(5)].map((_, i) => (
+                                        <svg key={i} className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                        </svg>
+                                    ))}
+                                </div>
+                                <p className="text-gray-300 text-sm md:text-base leading-relaxed mb-8 flex-grow">
+                                    "The <strong className="text-white font-medium">Smart Google Redirect</strong> is a game changer. We filter out negative experiences privately and direct only our happiest customers to Google. Our 5-star rating shot up in just two weeks!"
+                                </p>
+                                <div className="flex items-center gap-4 mt-auto">
+                                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-sm md:text-base shadow-lg shadow-blue-500/20">
+                                        JS
+                                    </div>
+                                    <div>
+                                        <p className="text-white font-semibold text-sm md:text-base">Jessica S.</p>
+                                        <p className="text-gray-500 text-xs md:text-sm">Boutique Cafe Owner</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Reveal>
+
+                        {/* Review 2 */}
+                        <Reveal delay={0.24} direction="up">
+                            <div className="glass-card p-6 md:p-8 flex flex-col h-full hover:border-[#ec4899]/30 transition-all duration-300 hover:-translate-y-1">
+                                <div className="flex items-center gap-1 mb-5">
+                                    {[...Array(5)].map((_, i) => (
+                                        <svg key={i} className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                        </svg>
+                                    ))}
+                                </div>
+                                <p className="text-gray-300 text-sm md:text-base leading-relaxed mb-8 flex-grow">
+                                    "We placed the <strong className="text-white font-medium">Custom QR Codes</strong> on all our tables and checkout counters. It's friction-free. Customers scan, hit 5 stars, and leave incredible feedback before they even walk out the door."
+                                </p>
+                                <div className="flex items-center gap-4 mt-auto">
+                                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white font-bold text-sm md:text-base shadow-lg shadow-pink-500/20">
+                                        MR
+                                    </div>
+                                    <div>
+                                        <p className="text-white font-semibold text-sm md:text-base">Marcus R.</p>
+                                        <p className="text-gray-500 text-xs md:text-sm">Restaurant Manager</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Reveal>
+
+                        {/* Review 3 */}
+                        <Reveal delay={0.36} direction="up">
+                            <div className="glass-card p-6 md:p-8 flex flex-col h-full hover:border-[#10b981]/30 transition-all duration-300 hover:-translate-y-1">
+                                <div className="flex items-center gap-1 mb-5">
+                                    {[...Array(5)].map((_, i) => (
+                                        <svg key={i} className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                        </svg>
+                                    ))}
+                                </div>
+                                <p className="text-gray-300 text-sm md:text-base leading-relaxed mb-8 flex-grow">
+                                    "The <strong className="text-white font-medium">Feedback Dashboard</strong> acts like our central hub. Having all customer sentiment centralized lets me quickly address issues privately before they ever escalate publicly."
+                                </p>
+                                <div className="flex items-center gap-4 mt-auto">
+                                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold text-sm md:text-base shadow-lg shadow-emerald-500/20">
+                                        DL
+                                    </div>
+                                    <div>
+                                        <p className="text-white font-semibold text-sm md:text-base">David L.</p>
+                                        <p className="text-gray-500 text-xs md:text-sm">SaaS Founder</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Reveal>
+                    </div>
+                </div>
+            </section>
+
             {/* Pricing Section */}
             <section className="relative px-4 py-16 sm:py-20 md:py-24 border-t border-white/5">
                 <div className="max-w-6xl mx-auto">
