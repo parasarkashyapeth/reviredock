@@ -51,6 +51,196 @@ function Reveal({ children, delay = 0, className = '', direction = 'up' }) {
     );
 }
 
+function ReviewDemo() {
+    const [step, setStep] = useState(0);
+    const [text, setText] = useState("");
+    const [starsHovered, setStarsHovered] = useState(0);
+    const fullText = "Absolutely stellar! The simple interface made my life 10x easier. Highly recommended.";
+
+    useEffect(() => {
+        let isMounted = true;
+        const runDemo = async () => {
+            while (isMounted) {
+                setStep(0);
+                setText("");
+                setStarsHovered(0);
+                await new Promise(r => setTimeout(r, 1500));
+                if (!isMounted) return;
+                
+                // Move mouse towards stars
+                setStep(0.5); // moving
+                await new Promise(r => setTimeout(r, 600));
+                if (!isMounted) return;
+                
+                // Simulate hovering over stars
+                for(let i=1; i<=5; i++) {
+                     setStarsHovered(i);
+                     await new Promise(r => setTimeout(r, 150));
+                     if (!isMounted) return;
+                }
+
+                // Click stars
+                setStep(1);
+                await new Promise(r => setTimeout(r, 600));
+                if (!isMounted) return;
+
+                // Move mouse to textarea
+                setStep(1.5);
+                await new Promise(r => setTimeout(r, 400));
+                
+                // Type text
+                setStep(2);
+                await new Promise(r => setTimeout(r, 300));
+                for (let i = 1; i <= fullText.length; i++) {
+                    if (!isMounted) return;
+                    setText(fullText.slice(0, i));
+                    await new Promise(r => setTimeout(r, 15 + Math.random() * 30));
+                }
+                await new Promise(r => setTimeout(r, 600));
+                if (!isMounted) return;
+
+                // Move mouse to submit and click
+                setStep(3);
+                await new Promise(r => setTimeout(r, 600));
+                if (!isMounted) return;
+                
+                // Click!
+                setStep(3.5);
+                await new Promise(r => setTimeout(r, 300));
+                if (!isMounted) return;
+
+                // Show success
+                setStep(4);
+                await new Promise(r => setTimeout(r, 3000));
+            }
+        };
+        runDemo();
+        return () => { isMounted = false; };
+    }, []);
+
+    const mousePos = {
+        0: { left: '85%', top: '110%' }, // Hidden bottom
+        0.5: { left: '80%', top: '38%' },  // over stars
+        1: { left: '80%', top: '38%' },  // 5th star clicked
+        1.5: { left: '50%', top: '65%' }, // to textarea
+        2: { left: '50%', top: '65%' },  // Textarea typing
+        3: { left: '50%', top: '88%' },  // Hover Submit button
+        3.5: { left: '50%', top: '88%' },  // Click Submit button
+        4: { left: '85%', top: '110%' }, // Hide
+    };
+
+    return (
+        <div className="relative w-full max-w-[400px] mx-auto group">
+            <div className={`absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-[32px] blur opacity-20 group-hover:opacity-40 transition duration-1000 ${step === 4 ? '!opacity-80 !from-emerald-500 !to-emerald-400 !blur-xl' : ''}`}></div>
+            
+            <div className="glass-card w-full p-6 sm:p-8 relative overflow-hidden min-h-[420px] bg-[#0a0a0a] flex flex-col justify-center border border-white/10 rounded-[28px] z-10 shadow-2xl shadow-black/50">
+                <div className={`absolute inset-0 bg-gradient-to-b from-emerald-900/40 to-black flex flex-col items-center justify-center transition-all duration-700 ease-out z-20 backdrop-blur-md ${step === 4 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none'}`}>
+                    <div className="relative">
+                        <div className={`w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mb-6 border border-emerald-500/50 shadow-[0_0_40px_rgba(16,185,129,0.3)] transition-transform duration-700 delay-100 ${step === 4 ? 'scale-100 rotate-0' : 'scale-0 -rotate-90'}`}>
+                            <svg className="w-10 h-10 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                        <div className={`absolute inset-0 rounded-full border-2 border-emerald-400 animate-[ping_1.5s_cubic-bezier(0,0,0.2,1)_infinite] ${step === 4 ? 'block' : 'hidden'}`}></div>
+                    </div>
+                    <h4 className={`text-2xl font-extrabold text-white mb-2 transition-all duration-500 delay-200 ${step === 4 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>Review Published!</h4>
+                    <p className={`text-emerald-300 font-medium text-sm transition-all duration-500 delay-300 ${step === 4 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>Redirecting to Google...</p>
+                </div>
+
+                <div className={`w-full transition-all duration-500 ${step === 4 ? 'opacity-0 scale-95 blur-md' : 'opacity-100 scale-100'}`}>
+                    <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 shrink-0 flex items-center justify-center shadow-[0_0_15px_rgba(139,92,246,0.5)] border border-white/20">
+                                <span className="text-white font-black text-xl">A</span>
+                            </div>
+                            <div>
+                                <h4 className="text-white font-bold text-lg tracking-wide">Acme Corp</h4>
+                                <p className="text-xs text-gray-400 font-medium">How was your experience?</p>
+                            </div>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center opacity-50">
+                            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12.0003 4.75C13.7703 4.75 15.3553 5.36 16.6053 6.54L20.0303 3.115C17.9503 1.195 15.2353 0 12.0003 0C7.31028 0 3.25528 2.69 1.25028 6.65L5.31028 9.8C6.26028 6.81 9.00528 4.75 12.0003 4.75Z" fill="#EA4335"/><path d="M23.49 12.275C23.49 11.49 23.415 10.73 23.3 10H12V14.51H18.47C18.18 15.99 17.34 17.25 16.08 18.1L20.14 21.25C22.505 19.07 23.49 15.955 23.49 12.275Z" fill="#4285F4"/><path d="M5.26498 14.2949C5.02498 13.5699 4.88501 12.7999 4.88501 11.9999C4.88501 11.1999 5.01998 10.4299 5.26498 9.7049L1.20998 6.5549C0.43998 8.0599 0 9.7599 0 11.9999C0 14.2399 0.43998 15.9399 1.20998 17.4449L5.26498 14.2949Z" fill="#FBBC05"/><path d="M12.0004 24C15.2404 24 17.9654 22.935 20.0604 21.095L16.0054 17.945C14.8954 18.685 13.5454 19.145 12.0004 19.145C8.95539 19.145 6.18039 17.025 5.20539 13.985L1.15039 17.135C3.15539 21.195 7.26039 24 12.0004 24Z" fill="#34A853"/></svg>
+                        </div>
+                    </div>
+                    
+                    <div className="flex justify-center gap-3 mb-8">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                            <svg 
+                                key={star} 
+                                className={`w-9 h-9 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] 
+                                ${step >= 1 ? 'text-yellow-400 scale-110 drop-shadow-[0_0_12px_rgba(250,204,21,0.6)]' 
+                                : starsHovered >= star ? 'text-yellow-400/80 scale-105' : 'text-gray-600 hover:text-gray-500 cursor-pointer'} 
+                                ${step === 1 && star === 5 ? 'scale-125' : ''}`}
+                                fill="currentColor" 
+                                viewBox="0 0 20 20"
+                            >
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                        ))}
+                    </div>
+
+                    <div className="relative mb-6">
+                        <textarea 
+                            readOnly
+                            value={text}
+                            placeholder="Tell us what you loved..."
+                            className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-4 text-[15px] leading-relaxed text-white resize-none h-28 focus:outline-none transition-all duration-300 placeholder:text-gray-600"
+                        />
+                        {(step === 2 || step === 3) && text.length < fullText.length && (
+                            <div className="absolute inline-block w-0.5 h-[1.125rem] bg-purple-400 animate-pulse ml-[2px] mt-1 align-middle rounded-full shadow-[0_0_8px_rgba(192,132,252,0.8)]" />
+                        )}
+                        <div className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white/[0.04] flex items-center justify-center">
+                             <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                            </svg>
+                        </div>
+                    </div>
+
+                    <button 
+                        disabled
+                        className={`w-full py-3.5 sm:py-4 rounded-xl font-bold tracking-wide transition-all duration-300 ${
+                            step >= 3 || (step === 2 && text.length === fullText.length)
+                                ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-[0_4px_20px_rgba(139,92,246,0.5)] hover:shadow-[0_4px_25px_rgba(139,92,246,0.7)]' 
+                                : 'bg-white/5 border border-white/10 text-gray-500'
+                        } ${step === 3.5 ? 'scale-[0.97]' : 'scale-100'}`}
+                    >
+                        Publish Review
+                    </button>
+                    
+                    <div 
+                        className="absolute z-50 pointer-events-none drop-shadow-[0_10px_15px_rgba(0,0,0,0.5)]"
+                        style={{
+                            transition: 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                            left: mousePos[step]?.left || '50%',
+                            top: mousePos[step]?.top || '110%',
+                            opacity: step === 4 ? 0 : 1,
+                            transform: (step === 1 || step === 3.5) ? 'scale(0.85) translate(-5%, -5%)' : 'scale(1)',
+                            marginLeft: '-8px',
+                            marginTop: '-4px',
+                        }}
+                    >
+                        {/* OS Native-style Arrow Cursor */}
+                        <svg 
+                            className="w-8 h-8 text-black"
+                            viewBox="0 0 32 32" 
+                            fill="none" 
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path 
+                                d="M8 4L8 26L12.5 20L17 27.5L20 25.5L15.5 18L21 18L8 4Z" 
+                                fill="currentColor" 
+                                stroke="white" 
+                                strokeWidth="2.5" 
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function LandingPage() {
     const { user, loading } = useAuth();
     const navigate = useNavigate();
@@ -120,6 +310,10 @@ export default function LandingPage() {
                 @keyframes shimmer {
                     0% { background-position: -200% 0; }
                     100% { background-position: 200% 0; }
+                }
+                @keyframes fade-in {
+                    0%, 10% { opacity: 0; transform: translateY(10px); }
+                    100% { opacity: 1; transform: translateY(0); }
                 }
                 .float-slow { animation: float 8s ease-in-out infinite; }
                 .float-fast { animation: float 6s ease-in-out infinite 1s; }
@@ -325,6 +519,48 @@ export default function LandingPage() {
                             </Reveal>
                         ))}
                     </div>
+                </div>
+            </section>
+
+            {/* Live Demo Section */}
+            <section className="relative px-4 py-16 md:py-24 border-t border-white/5 overflow-hidden">
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-4xl bg-purple-600/5 blur-[120px] rounded-full" />
+                </div>
+                <div className="max-w-6xl mx-auto flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
+                    <Reveal className="lg:w-1/2" direction="right">
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 w-max mb-6">
+                            <span className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]"></span>
+                            <span className="text-xs font-semibold tracking-wide text-gray-300">See It In Action</span>
+                        </div>
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-6 text-white tracking-tight">
+                            Frictionless Feedback
+                        </h2>
+                        <p className="text-gray-400 text-sm sm:text-base md:text-lg mb-8 leading-relaxed">
+                            Watch how easily your customers can leave glowing reviews.
+                            We've minimized the steps so you get maximum feedback. No logins, no hassle—just a smooth, delightful experience.
+                        </p>
+                        <ul className="space-y-4">
+                            {[
+                                "1-Click Star Ratings",
+                                "Smooth Custom Interfaces",
+                                "Zero Friction Point"
+                            ].map((item, i) => (
+                                <li key={i} className="flex items-center gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center shrink-0">
+                                        <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                    <span className="text-gray-300 font-medium">{item}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </Reveal>
+                    
+                    <Reveal className="lg:w-1/2 w-full" delay={0.2} direction="left">
+                        <ReviewDemo />
+                    </Reveal>
                 </div>
             </section>
 

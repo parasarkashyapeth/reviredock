@@ -711,6 +711,77 @@ export default function Dashboard() {
                             </div>
                         </div>
 
+                        {/* Current Feedbacks AI Summary Result */}
+                        {aiSummary && (
+                            <div className="p-6 rounded-2xl mb-8" style={glassCard}>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
+                                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                        <span className="text-purple-400"><IconBot className="w-6 h-6 inline" /></span> AI-Powered Insights Tracker
+                                    </h3>
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-xs text-white/50 bg-white/5 px-2 py-1 rounded-md">Analyzed: {aiSummary.totalAnalyzed}</span>
+                                        <button onClick={() => setAiSummary(null)} className="text-white/40 hover:text-white transition-colors" title="Close AI Summary">✕</button>
+                                    </div>
+                                </div>
+
+                                <div className="p-4 rounded-xl mb-4" style={{ background: 'linear-gradient(115deg, rgba(139, 92, 246, 0.12) 0%, rgba(118, 75, 162, 0.08) 100%)', border: '1px solid rgba(139, 92, 246, 0.25)' }}>
+                                    <h4 className="text-xs font-semibold text-purple-300 mb-2">Executive Summary</h4>
+                                    <p className="text-sm text-white/90">{aiSummary.overallSummary}</p>
+                                </div>
+
+                                <div className="flex gap-4 mb-4">
+                                    <div className="flex-1 p-4 rounded-xl text-center" style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+                                        <span className="text-2xl font-bold text-green-400">{aiSummary.positive || 0}</span>
+                                        <p className="text-xs text-green-400/70">Positive Feedbacks</p>
+                                    </div>
+                                    <div className="flex-1 p-4 rounded-xl text-center" style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                        <span className="text-2xl font-bold text-red-400">{aiSummary.negative || 0}</span>
+                                        <p className="text-xs text-red-400/70">Negative Feedbacks</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {aiSummary.topPositivePoints && aiSummary.topPositivePoints.length > 0 && (
+                                        <div className="p-4 rounded-xl" style={{ background: 'rgba(34, 197, 94, 0.06)', border: '1px solid rgba(34, 197, 99, 0.15)' }}>
+                                            <h4 className="text-xs font-semibold text-green-400 mb-2">Key Strengths</h4>
+                                            <ul className="space-y-1">
+                                                {aiSummary.topPositivePoints.map((p, i) => (
+                                                    <li key={i} className="text-xs text-white/70 flex items-start gap-2">
+                                                        <span className="text-green-400 mt-0.5">•</span> {p}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {aiSummary.topNegativePoints && aiSummary.topNegativePoints.length > 0 && (
+                                        <div className="p-4 rounded-xl" style={{ background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                                            <h4 className="text-xs font-semibold text-red-400 mb-2">Areas to Improve</h4>
+                                            <ul className="space-y-1">
+                                                {aiSummary.topNegativePoints.map((p, i) => (
+                                                    <li key={i} className="text-xs text-white/70 flex items-start gap-2">
+                                                        <span className="text-red-400 mt-0.5">•</span> {p}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {aiSummary.recommendations && aiSummary.recommendations.length > 0 && (
+                                    <div className="mt-4 p-4 rounded-xl" style={{ background: 'rgba(59, 130, 246, 0.06)', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
+                                        <h4 className="text-xs font-semibold text-blue-400 mb-2">💡 Recommended Actions</h4>
+                                        <ul className="space-y-1">
+                                            {aiSummary.recommendations.map((r, i) => (
+                                                <li key={i} className="text-xs text-white/70 flex items-start gap-2">
+                                                    <span className="text-blue-400 mt-0.5">{i + 1}.</span> {r}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Recent Feedback List with Type Filter */}
                         <div className="p-6" style={glassCard}>
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
@@ -772,6 +843,19 @@ export default function Dashboard() {
                                         }}
                                     >
                                         Negative ({stats.negative})
+                                    </button>
+                                    <button
+                                        onClick={fetchAiSummary}
+                                        disabled={aiLoading || feedbacks.length === 0}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300"
+                                        style={{
+                                            background: 'rgba(168, 85, 247, 0.2)',
+                                            border: '1px solid rgba(168, 85, 247, 0.4)',
+                                            color: '#c084fc',
+                                            opacity: (aiLoading || feedbacks.length === 0) ? 0.5 : 1,
+                                        }}
+                                    >
+                                        {aiLoading ? 'Generating...' : <><IconBot className="w-4 h-4 inline mr-1" /> AI Summary</>}
                                     </button>
                                     <button
                                         onClick={exportCSV}
@@ -863,6 +947,15 @@ export default function Dashboard() {
                                                         }`}>
                                                             {feedback.is_positive ? 'Positive' : 'Negative'}
                                                         </span>
+                                                        {feedback.ai_sentiment && (
+                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                                                                feedback.ai_sentiment.toLowerCase() === 'positive' ? 'border-green-500/30 text-green-300' :
+                                                                feedback.ai_sentiment.toLowerCase() === 'negative' ? 'border-red-500/30 text-red-300' :
+                                                                'border-yellow-500/30 text-yellow-300'
+                                                            }`} title={`AI Confidence: ${feedback.ai_confidence || 0}%`}>
+                                                                🤖 {feedback.ai_sentiment}
+                                                            </span>
+                                                        )}
                                                         {feedback.owner_reply && (
                                                             <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
                                                                 <><IconCheck className="w-3.5 h-3.5 inline mr-0.5" /> Replied</>

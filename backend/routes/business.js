@@ -958,10 +958,10 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
             groupBy = 'day';
         }
 
-        // Fetch all feedbacks in range
+        // Fetch all feedbacks in range — include more fields for advanced analytics
         const { data: feedbacks, error } = await supabase
             .from('feedbacks')
-            .select('rating, is_positive, created_at')
+            .select('rating, is_positive, created_at, message, owner_reply, replied_at, ai_sentiment, ai_confidence, source')
             .eq('business_id', id)
             .gte('created_at', fromDate.toISOString())
             .lte('created_at', toDate.toISOString())
@@ -1031,11 +1031,13 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
         });
 
         // Calculate averages and format for chart
+        let cumulativeTotal = 0;
         const chartData = labels.map(label => {
             const data = groupedData[label];
             const avgRating = data.ratings.length > 0
                 ? (data.ratings.reduce((a, b) => a + b, 0) / data.ratings.length).toFixed(1)
                 : 0;
+            cumulativeTotal += data.total;
 
             // Format label for display
             let displayLabel = label;
@@ -1054,7 +1056,9 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
                 total: data.total,
                 positive: data.positive,
                 negative: data.negative,
-                avgRating: parseFloat(avgRating)
+                avgRating: parseFloat(avgRating),
+                cumulative: cumulativeTotal,
+                positiveRate: data.total > 0 ? Math.round((data.positive / data.total) * 100) : 0
             };
         });
 
@@ -1066,6 +1070,102 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
             ? (feedbacks.reduce((sum, f) => sum + f.rating, 0) / totalFeedback).toFixed(1)
             : 0;
 
+        // --- Advanced Analytics ---
+
+        // Rating distribution (1-5 stars)
+        const ratingDistribution = [1, 2, 3, 4, 5].map(star => ({
+            star,
+            name: `${star} ★`,
+            count: feedbacks.filter(f => f.rating === star).length,
+            percentage: totalFeedback > 0 ? Math.round((feedbacks.filter(f => f.rating === star).length / totalFeedback) * 100) : 0
+        }));
+
+        // Hourly activity heatmap (0-23 hours × 7 days of week)
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const hourlyHeatmap = [];
+        const heatmapGrid = {};
+        feedbacks.forEach(f => {
+            const d = new Date(f.created_at);
+            const day = d.getDay();
+            const hour = d.getHours();
+            const key = `${day}-${hour}`;
+            heatmapGrid[key] = (heatmapGrid[key] || 0) + 1;
+        });
+        for (let day = 0; day < 7; day++) {
+            for (let hour = 0; hour < 24; hour++) {
+                const key = `${day}-${hour}`;
+                hourlyHeatmap.push({
+                    day: dayNames[day],
+                    dayIndex: day,
+                    hour,
+                    hourLabel: hour === 0 ? '12am' : hour < 12 ? `${hour}am` : hour === 12 ? '12pm' : `${hour - 12}pm`,
+                    count: heatmapGrid[key] || 0
+                });
+            }
+        }
+
+        // Response metrics
+        const repliedCount = feedbacks.filter(f => f.owner_reply).length;
+        const responseRate = totalFeedback > 0 ? Math.round((repliedCount / totalFeedback) * 100) : 0;
+        let avgResponseTimeHours = null;
+        const repliedFbs = feedbacks.filter(f => f.owner_reply && f.replied_at && f.created_at);
+        if (repliedFbs.length > 0) {
+            const totalHours = repliedFbs.reduce((sum, f) => {
+                return sum + ((new Date(f.replied_at) - new Date(f.created_at)) / (1000 * 60 * 60));
+            }, 0);
+            avgResponseTimeHours = parseFloat((totalHours / repliedFbs.length).toFixed(1));
+        }
+
+        // AI Sentiment breakdown
+        const aiBreakdown = { positive: 0, negative: 0, neutral: 0, mixed: 0, noAi: 0 };
+        feedbacks.forEach(f => {
+            if (!f.ai_sentiment) { aiBreakdown.noAi++; return; }
+            const s = f.ai_sentiment.toLowerCase();
+            if (s === 'positive') aiBreakdown.positive++;
+            else if (s === 'negative') aiBreakdown.negative++;
+            else if (s === 'neutral') aiBreakdown.neutral++;
+            else aiBreakdown.mixed++;
+        });
+        const aiConfidenceAvg = (() => {
+            const withConf = feedbacks.filter(f => f.ai_confidence != null);
+            if (withConf.length === 0) return null;
+            return parseFloat((withConf.reduce((s, f) => s + f.ai_confidence, 0) / withConf.length).toFixed(1));
+        })();
+
+        // Feedback sources breakdown
+        const sourceCounts = {};
+        feedbacks.forEach(f => {
+            const src = f.source || 'qr_code';
+            sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+        });
+        const sourceBreakdown = Object.entries(sourceCounts).map(([source, count]) => ({
+            source,
+            name: source === 'qr_code' ? 'QR Code' : source === 'external' ? 'External' : source.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+            count,
+            percentage: totalFeedback > 0 ? Math.round((count / totalFeedback) * 100) : 0
+        })).sort((a, b) => b.count - a.count);
+
+        // Top keywords from messages
+        const stopWords = new Set(['the', 'is', 'at', 'in', 'it', 'a', 'an', 'and', 'or', 'to', 'of', 'for', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'shall', 'not', 'but', 'if', 'they', 'them', 'their', 'this', 'that', 'these', 'those', 'my', 'your', 'his', 'her', 'its', 'our', 'we', 'you', 'i', 'me', 'he', 'she', 'with', 'on', 'from', 'by', 'are', 'am', 'so', 'very', 'just', 'all', 'no', 'yes', 'also', 'too', 'more', 'much', 'than', 'then', 'about', 'up', 'out', 'what', 'which', 'who', 'when', 'where', 'how', 'here', 'there', 'really', 'get', 'got', 'us']);
+        const wordCounts = {};
+        feedbacks.forEach(f => {
+            if (f.message) {
+                f.message.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).forEach(w => {
+                    if (w.length > 2 && !stopWords.has(w)) wordCounts[w] = (wordCounts[w] || 0) + 1;
+                });
+            }
+        });
+        const topKeywords = Object.entries(wordCounts)
+            .filter(([_, c]) => c > 1)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 20)
+            .map(([word, count]) => ({ word, count }));
+
+        // NPS Score
+        const promoters = feedbacks.filter(f => f.rating >= 4).length;
+        const detractors = feedbacks.filter(f => f.rating <= 2).length;
+        const npsScore = totalFeedback > 0 ? Math.round(((promoters - detractors) / totalFeedback) * 100) : 0;
+
         res.json({
             chartData,
             summary: {
@@ -1073,8 +1173,21 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
                 positive: totalPositive,
                 negative: totalNegative,
                 avgRating: parseFloat(avgRating),
-                positiveRate: totalFeedback > 0 ? Math.round((totalPositive / totalFeedback) * 100) : 0
+                positiveRate: totalFeedback > 0 ? Math.round((totalPositive / totalFeedback) * 100) : 0,
+                npsScore,
+                responseRate,
+                repliedCount,
+                avgResponseTimeHours
             },
+            ratingDistribution,
+            hourlyHeatmap,
+            aiSentiment: {
+                breakdown: aiBreakdown,
+                avgConfidence: aiConfidenceAvg,
+                totalAnalyzed: totalFeedback - aiBreakdown.noAi
+            },
+            sourceBreakdown,
+            topKeywords,
             range: {
                 from: fromDate.toISOString(),
                 to: toDate.toISOString(),
