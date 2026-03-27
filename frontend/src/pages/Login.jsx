@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import Threads from '../components/Threads'
 
 // Inject glass animations
 const GLASS_KEYFRAMES_ID = 'glass-auth-keyframes';
@@ -73,15 +72,7 @@ export default function Login() {
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-black">
-            {/* Animated Threads Background */}
-            <div className="absolute inset-0 z-0">
-                <Threads
-                    amplitude={1}
-                    distance={0}
-                    enableMouseInteraction
-                    color={[0.4, 0.3, 0.9]}
-                />
-            </div>
+            {/* Animated Threads Background Removed */}
 
             {/* Glass Card Container */}
             <div
@@ -108,18 +99,9 @@ export default function Login() {
                         WebkitBackdropFilter: 'blur(20px)',
                         border: '1px solid rgba(255, 255, 255, 0.15)',
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                        animation: 'borderGlow 4s ease-in-out infinite',
                     }}
                 >
-                    {/* Shine Effect */}
-                    <div
-                        className="absolute inset-0 pointer-events-none opacity-30"
-                        style={{
-                            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%)',
-                            backgroundSize: '200% 100%',
-                            animation: 'glassShine 8s ease-in-out infinite',
-                        }}
-                    />
+
 
                     {/* Header */}
                     <div className="text-center mb-8 relative">
@@ -220,14 +202,7 @@ export default function Login() {
                                 opacity: loading ? 0.7 : 1,
                             }}
                         >
-                            {/* Button Shine */}
-                            <span
-                                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                                style={{
-                                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
-                                    animation: 'glassShine 2s ease-in-out infinite',
-                                }}
-                            />
+
                             <span className="relative z-10">
                                 {loading ? (
                                     <span className="flex items-center justify-center">

@@ -15,6 +15,13 @@ const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:8000').repla
 
 let razorpay = null;
 
+// ── Diagnostic boot logs ──
+console.log('[Razorpay] KEY_ID present :', !!RAZORPAY_KEY_ID);
+console.log('[Razorpay] KEY_ID prefix  :', RAZORPAY_KEY_ID ? RAZORPAY_KEY_ID.substring(0, 12) + '...' : 'MISSING');
+console.log('[Razorpay] SECRET present :', !!RAZORPAY_KEY_SECRET);
+console.log('[Razorpay] SECRET length  :', RAZORPAY_KEY_SECRET ? RAZORPAY_KEY_SECRET.length : 0);
+console.log('[Razorpay] MODE           :', RAZORPAY_KEY_ID?.startsWith('rzp_live_') ? 'LIVE 🔴' : RAZORPAY_KEY_ID?.startsWith('rzp_test_') ? 'TEST 🟢' : 'UNKNOWN ⚠️');
+
 if (RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET) {
     razorpay = new Razorpay({
         key_id: RAZORPAY_KEY_ID,
@@ -49,24 +56,94 @@ const PLANS = {
     },
 };
 
+// ── Coupon definitions ──
+// discountPct: percentage off (e.g. 10 = 10% off)
+const COUPONS = {
+    'WELCOME10':      { discountPct: 10,  description: '10% off for new users' },
+    'REVIEWDOCK10':   { discountPct: 10,  description: '10% off – ReviewDock promo' },
+    '100XSOLUTIONS':  { discountPct: 10,  description: '10% off – 100X Solutions' },
+    'TOP100':         { discountPct: 30,  description: '30% off – Top 100 partner' },
+    'TOP500':         { discountPct: 20,  description: '20% off – Top 500 partner' },
+    'SAVE15':         { discountPct: 15,  description: '15% off' },
+    'SPECIAL15':      { discountPct: 15,  description: '15% off – Special offer' },
+};
+
+/**
+ * Helper: apply coupon discount to an amount (in paise)
+ * Returns { discountedAmount, discountPct, discountAmount } or null if invalid code.
+ */
+function applyCoupon(baseAmount, couponCode) {
+    if (!couponCode) return null;
+    const coupon = COUPONS[couponCode.toUpperCase().trim()];
+    if (!coupon) return null;
+    const discountAmount = Math.round(baseAmount * coupon.discountPct / 100);
+    return {
+        discountPct: coupon.discountPct,
+        discountAmount,
+        discountedAmount: baseAmount - discountAmount,
+        description: coupon.description,
+    };
+}
+
 /**
  * POST /api/payment/create-payment-link
  * Create a Razorpay Payment Link (hosted checkout — no domain whitelisting needed)
  */
+/**
+ * POST /api/payment/validate-coupon
+ * Validate a coupon code and return discount info — no auth required.
+ */
+router.post('/validate-coupon', async (req, res) => {
+    const { couponCode, planId } = req.body;
+    if (!couponCode) {
+        return res.status(400).json({ error: 'Coupon code is required' });
+    }
+    if (!planId || !PLANS[planId]) {
+        return res.status(400).json({ error: 'Invalid plan' });
+    }
+    const plan = PLANS[planId];
+    const result = applyCoupon(plan.amount, couponCode);
+    if (!result) {
+        return res.status(404).json({ error: 'Invalid or expired coupon code' });
+    }
+    res.json({
+        valid: true,
+        couponCode: couponCode.toUpperCase().trim(),
+        discountPct: result.discountPct,
+        discountAmount: result.discountAmount,
+        discountAmountDisplay: `₹${(result.discountAmount / 100).toLocaleString('en-IN')}`,
+        originalAmount: plan.amount,
+        originalAmountDisplay: `₹${(plan.amount / 100).toLocaleString('en-IN')}`,
+        finalAmount: result.discountedAmount,
+        finalAmountDisplay: `₹${(result.discountedAmount / 100).toLocaleString('en-IN')}`,
+        description: result.description,
+    });
+});
+
 router.post('/create-payment-link', authenticate, async (req, res) => {
     try {
         if (!razorpay) {
             return res.status(503).json({ error: 'Payment gateway not configured. Contact support.' });
         }
 
-        const { planId } = req.body;
+        const { planId, couponCode } = req.body;
         const { businessId, userId } = req.user;
+
+        console.log(`[Payment] create-payment-link called by userId=${userId} businessId=${businessId} planId=${planId} coupon=${couponCode || 'none'}`);
+        console.log('[Payment] Using KEY_ID :', RAZORPAY_KEY_ID ? RAZORPAY_KEY_ID.substring(0, 12) + '...' : 'MISSING');
+        console.log('[Payment] KEY_ID mode  :', RAZORPAY_KEY_ID?.startsWith('rzp_live_') ? 'LIVE' : 'TEST');
 
         if (!planId || !PLANS[planId]) {
             return res.status(400).json({ error: 'Invalid plan selected' });
         }
 
         const plan = PLANS[planId];
+
+        // Apply coupon discount server-side (cannot be tampered by client)
+        const couponResult = applyCoupon(plan.amount, couponCode);
+        const finalAmount = couponResult ? couponResult.discountedAmount : plan.amount;
+
+        console.log(`[Payment] Plan: ${plan.name} | Base: ${plan.amount} paise | Final: ${finalAmount} paise | Coupon: ${couponResult ? couponResult.discountPct + '%' : 'none'}`);
 
         // Check if user already has this plan
         const { data: business } = await supabase
@@ -89,9 +166,18 @@ router.post('/create-payment-link', authenticate, async (req, res) => {
         // Generate a unique reference ID for this payment
         const referenceId = `pay_${businessId.substring(0, 8)}_${Date.now()}`;
 
+        const paymentLinkPayload = {
+            amount: finalAmount,
+            currency: plan.currency,
+            description: `ReviewDock ${plan.name} Subscription`,
+            reference_id: referenceId,
+            callback_url: `${FRONTEND_URL}/payment/callback`,
+        };
+        console.log('[Payment] Sending to Razorpay:', JSON.stringify(paymentLinkPayload));
+
         // Create Razorpay Payment Link (hosted checkout)
         const paymentLink = await razorpay.paymentLink.create({
-            amount: plan.amount,
+            amount: finalAmount,
             currency: plan.currency,
             accept_partial: false,
             description: `ReviewDock ${plan.name} Subscription`,
@@ -108,6 +194,7 @@ router.post('/create-payment-link', authenticate, async (req, res) => {
                 plan_id: planId,
                 plan_name: plan.name,
                 reference_id: referenceId,
+                coupon_code: couponResult ? couponResult.discountPct + '% off' : 'none',
             },
             callback_url: `${FRONTEND_URL}/payment/callback`,
             callback_method: 'get',
@@ -126,7 +213,7 @@ router.post('/create-payment-link', authenticate, async (req, res) => {
                 razorpay_order_id: paymentLink.order_id || '',
                 razorpay_payment_link_id: paymentLink.id,
                 plan_id: planId,
-                amount: plan.amount,
+                amount: finalAmount,
                 currency: plan.currency,
                 status: 'created',
                 reference_id: referenceId,
@@ -138,13 +225,20 @@ router.post('/create-payment-link', authenticate, async (req, res) => {
             paymentLinkUrl: paymentLink.short_url,
             paymentLinkId: paymentLink.id,
             referenceId: referenceId,
-            amount: plan.amount,
+            amount: finalAmount,
+            originalAmount: plan.amount,
             currency: plan.currency,
             planName: plan.name,
+            couponApplied: couponResult ? true : false,
+            discountPct: couponResult?.discountPct || 0,
         });
     } catch (error) {
-        console.error('Create payment link error:', error);
-        res.status(500).json({ error: 'Failed to create payment link' });
+        console.error('[Payment] ❌ Create payment link FAILED');
+        console.error('[Payment] Error statusCode :', error?.statusCode);
+        console.error('[Payment] Error description :', error?.error?.description);
+        console.error('[Payment] Error code       :', error?.error?.code);
+        console.error('[Payment] Full error dump  :', JSON.stringify(error, null, 2));
+        res.status(500).json({ error: 'Failed to create payment link', razorpayError: error?.error?.description });
     }
 });
 

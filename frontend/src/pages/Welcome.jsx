@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import Threads from '../components/Threads'
 import Lanyard from '../components/Lanyard'
 
 // Inject welcome page animations
@@ -64,15 +63,7 @@ export default function Welcome() {
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden bg-black">
-            {/* Animated Threads Background */}
-            <div className="absolute inset-0 z-0">
-                <Threads
-                    amplitude={1}
-                    distance={0}
-                    enableMouseInteraction
-                    color={[0.4, 0.3, 0.9]}
-                />
-            </div>
+            {/* Animated Threads Background Removed */}
 
             {/* Welcome Content */}
             <div className="relative z-10 flex flex-col items-center gap-4">

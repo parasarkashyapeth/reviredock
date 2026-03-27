@@ -21,6 +21,43 @@ export default function Pricing() {
     const [loading, setLoading] = useState(true)
     const [paying, setPaying] = useState(false)
 
+    // Coupon state: { [planId]: { code, validating, result, error } }
+    const [coupons, setCoupons] = useState({})
+
+    const getCouponState = (planId) => coupons[planId] || { code: '', validating: false, result: null, error: null }
+
+    const updateCoupon = (planId, patch) => setCoupons(prev => ({
+        ...prev,
+        [planId]: { ...getCouponState(planId), ...patch }
+    }))
+
+    const handleCouponChange = (planId, value) => {
+        updateCoupon(planId, { code: value, result: null, error: null })
+    }
+
+    const validateCoupon = async (planId) => {
+        const { code } = getCouponState(planId)
+        if (!code.trim()) return
+        updateCoupon(planId, { validating: true, result: null, error: null })
+        try {
+            const res = await fetch(`${API_URL}/api/payment/validate-coupon`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ couponCode: code.trim(), planId }),
+            })
+            const data = await res.json()
+            if (res.ok) {
+                updateCoupon(planId, { validating: false, result: data, error: null })
+            } else {
+                updateCoupon(planId, { validating: false, result: null, error: data.error || 'Invalid code' })
+            }
+        } catch {
+            updateCoupon(planId, { validating: false, result: null, error: 'Could not validate code' })
+        }
+    }
+
+    const clearCoupon = (planId) => updateCoupon(planId, { code: '', result: null, error: null })
+
     useEffect(() => {
         fetchPlanInfo()
     }, [])
@@ -105,6 +142,7 @@ export default function Pricing() {
 
         try {
             const token = getToken()
+            const couponCode = getCouponState(planId).result?.couponCode || ''
 
             // 1. Create a Razorpay Payment Link on the backend
             const res = await fetch(`${API_URL}/api/payment/create-payment-link`, {
@@ -113,7 +151,7 @@ export default function Pricing() {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ planId }),
+                body: JSON.stringify({ planId, couponCode }),
             })
 
             if (!res.ok) {
@@ -278,6 +316,111 @@ export default function Pricing() {
                                 ))}
                             </ul>
 
+                            {/* ── Coupon Code Input (paid plans only) ── */}
+                            {plan.planId !== 'free' && !plan.isCurrent && (() => {
+                                const cs = getCouponState(plan.planId)
+                                return (
+                                    <div className="mb-4" onClick={e => e.stopPropagation()}>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={cs.code}
+                                                onChange={e => handleCouponChange(plan.planId, e.target.value.toUpperCase())}
+                                                onKeyDown={e => e.key === 'Enter' && validateCoupon(plan.planId)}
+                                                placeholder="Coupon code"
+                                                maxLength={20}
+                                                style={{
+                                                    flex: 1,
+                                                    padding: '8px 12px',
+                                                    borderRadius: '8px',
+                                                    border: cs.result
+                                                        ? '1px solid rgba(34,197,94,0.5)'
+                                                        : cs.error
+                                                            ? '1px solid rgba(239,68,68,0.5)'
+                                                            : '1px solid rgba(255,255,255,0.15)',
+                                                    background: 'rgba(255,255,255,0.05)',
+                                                    color: '#fff',
+                                                    fontSize: '13px',
+                                                    outline: 'none',
+                                                    letterSpacing: '0.05em',
+                                                    fontWeight: 600,
+                                                }}
+                                            />
+                                            {cs.result ? (
+                                                <button
+                                                    onClick={() => clearCoupon(plan.planId)}
+                                                    style={{
+                                                        padding: '8px 10px',
+                                                        borderRadius: '8px',
+                                                        border: '1px solid rgba(239,68,68,0.3)',
+                                                        background: 'rgba(239,68,68,0.1)',
+                                                        color: '#f87171',
+                                                        fontSize: '12px',
+                                                        cursor: 'pointer',
+                                                        whiteSpace: 'nowrap',
+                                                    }}
+                                                >
+                                                    ✕
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => validateCoupon(plan.planId)}
+                                                    disabled={!cs.code.trim() || cs.validating}
+                                                    style={{
+                                                        padding: '8px 12px',
+                                                        borderRadius: '8px',
+                                                        border: '1px solid rgba(102,126,234,0.4)',
+                                                        background: 'rgba(102,126,234,0.15)',
+                                                        color: '#a5b4fc',
+                                                        fontSize: '12px',
+                                                        fontWeight: 600,
+                                                        cursor: cs.code.trim() ? 'pointer' : 'default',
+                                                        whiteSpace: 'nowrap',
+                                                        opacity: cs.code.trim() ? 1 : 0.45,
+                                                    }}
+                                                >
+                                                    {cs.validating ? '...' : 'Apply'}
+                                                </button>
+                                            )}
+                                        </div>
+                                        {/* Coupon feedback */}
+                                        {cs.result && (
+                                            <div style={{
+                                                marginTop: '8px',
+                                                padding: '8px 12px',
+                                                borderRadius: '8px',
+                                                background: 'rgba(34,197,94,0.1)',
+                                                border: '1px solid rgba(34,197,94,0.25)',
+                                                fontSize: '12px',
+                                                color: '#4ade80',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                            }}>
+                                                <span>🎉</span>
+                                                <span>
+                                                    <strong>{cs.result.discountPct}% OFF</strong> — saves {cs.result.discountAmountDisplay}!
+                                                    Pay {cs.result.finalAmountDisplay} instead of <s style={{ opacity: 0.6 }}>{cs.result.originalAmountDisplay}</s>
+                                                </span>
+                                            </div>
+                                        )}
+                                        {cs.error && (
+                                            <div style={{
+                                                marginTop: '8px',
+                                                padding: '6px 12px',
+                                                borderRadius: '8px',
+                                                background: 'rgba(239,68,68,0.08)',
+                                                border: '1px solid rgba(239,68,68,0.2)',
+                                                fontSize: '12px',
+                                                color: '#f87171',
+                                            }}>
+                                                ❌ {cs.error}
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })()}
+
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation()
@@ -317,7 +460,13 @@ export default function Pricing() {
                                         <span className="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
                                         Redirecting...
                                     </span>
-                                ) : plan.buttonText}
+                                ) : (() => {
+                                    const cs = getCouponState(plan.planId)
+                                    if (cs.result && plan.planId !== 'free' && !plan.isCurrent) {
+                                        return `Pay ${cs.result.finalAmountDisplay}`
+                                    }
+                                    return plan.buttonText
+                                })()}
                             </button>
                         </div>
                     ))}
