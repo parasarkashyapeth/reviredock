@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
@@ -47,6 +47,79 @@ function Reveal({ children, delay = 0, className = '', direction = 'up' }) {
             }}
         >
             {children}
+        </div>
+    );
+}
+
+// Falling words animation component
+const FALLING_WORDS = [
+    { text: 'Review', color: '#60a5fa' },
+    { text: 'Google Review', color: '#34d399' },
+    { text: '5 Stars', color: '#fbbf24' },
+    { text: 'Feedback', color: '#a78bfa' },
+    { text: 'Trust', color: '#f472b6' },
+    { text: 'Ratings', color: '#fb923c' },
+    { text: '⭐⭐⭐⭐⭐', color: '#fbbf24' },
+    { text: 'Testimonial', color: '#2dd4bf' },
+    { text: 'Social Proof', color: '#818cf8' },
+    { text: 'Reputation', color: '#f87171' },
+    { text: 'Verified', color: '#4ade80' },
+    { text: 'Customer Love', color: '#fb7185' },
+];
+
+function FallingWords() {
+    const [particles, setParticles] = useState([]);
+    const idRef = useRef(0);
+
+    useEffect(() => {
+        const spawn = () => {
+            const word = FALLING_WORDS[Math.floor(Math.random() * FALLING_WORDS.length)];
+            const id = idRef.current++;
+            const left = 10 + Math.random() * 80; // 10% to 90%
+            const duration = 2.5 + Math.random() * 2; // 2.5s to 4.5s
+            const size = 0.65 + Math.random() * 0.5; // 0.65rem to 1.15rem
+            const rotation = -30 + Math.random() * 60; // -30deg to 30deg
+            const delay = Math.random() * 0.3;
+
+            setParticles(prev => [
+                ...prev,
+                { id, ...word, left, duration, size, rotation, delay }
+            ]);
+
+            // Remove particle after animation
+            setTimeout(() => {
+                setParticles(prev => prev.filter(p => p.id !== id));
+            }, (duration + delay) * 1000 + 200);
+        };
+
+        // Initial burst
+        for (let i = 0; i < 6; i++) {
+            setTimeout(spawn, i * 300);
+        }
+
+        // Continuous spawning
+        const interval = setInterval(spawn, 600 + Math.random() * 400);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="falling-words-container" aria-hidden="true">
+            {particles.map(p => (
+                <span
+                    key={p.id}
+                    className="falling-word"
+                    style={{
+                        left: `${p.left}%`,
+                        fontSize: `${p.size}rem`,
+                        color: p.color,
+                        animationDuration: `${p.duration}s`,
+                        animationDelay: `${p.delay}s`,
+                        '--rotation': `${p.rotation}deg`,
+                    }}
+                >
+                    {p.text}
+                </span>
+            ))}
         </div>
     );
 }
@@ -323,6 +396,63 @@ export default function LandingPage() {
                     background-size: 200% 100%;
                     animation: shimmer 5s ease-in-out infinite;
                 }
+
+                /* Falling words animation */
+                .falling-words-container {
+                    position: absolute;
+                    top: -20px;
+                    left: 0;
+                    right: 0;
+                    height: 120%;
+                    pointer-events: none;
+                    overflow: hidden;
+                    z-index: 1;
+                }
+                .falling-word {
+                    position: absolute;
+                    top: -40px;
+                    font-weight: 700;
+                    white-space: nowrap;
+                    opacity: 0;
+                    text-shadow: 0 0 20px currentColor;
+                    animation: wordFall var(--duration, 3s) ease-in forwards;
+                    animation-delay: var(--delay, 0s);
+                    transform: translateX(-50%);
+                    letter-spacing: 0.02em;
+                    filter: blur(0px);
+                }
+                @keyframes wordFall {
+                    0% {
+                        opacity: 0;
+                        top: -40px;
+                        transform: translateX(-50%) rotate(var(--rotation, 0deg)) scale(1.2);
+                        filter: blur(0px);
+                        text-shadow: 0 0 20px currentColor;
+                    }
+                    15% {
+                        opacity: 0.9;
+                        filter: blur(0px);
+                    }
+                    60% {
+                        opacity: 0.7;
+                        transform: translateX(-50%) rotate(0deg) scale(1);
+                        filter: blur(0px);
+                    }
+                    80% {
+                        opacity: 0.4;
+                        top: 65%;
+                        transform: translateX(-50%) rotate(0deg) scale(0.7);
+                        filter: blur(1px);
+                        text-shadow: 0 0 30px currentColor;
+                    }
+                    100% {
+                        opacity: 0;
+                        top: 72%;
+                        transform: translateX(-50%) rotate(0deg) scale(0.3);
+                        filter: blur(4px);
+                        text-shadow: 0 0 40px currentColor;
+                    }
+                }
             `}} />
 
             {/* Top Navigation */}
@@ -361,6 +491,9 @@ export default function LandingPage() {
                 </div>
 
                 <div className="relative z-10 w-full max-w-4xl mx-auto text-center flex flex-col items-center">
+                    {/* Falling words animation */}
+                    <FallingWords />
+
                     {/* Logo/Icon */}
                     <Reveal delay={0.1}>
                         <div className="flex items-center justify-center mt-16 sm:mt-12 md:mt-0 mb-4 md:mb-6">
@@ -371,7 +504,7 @@ export default function LandingPage() {
                     </Reveal>
 
                     <Reveal delay={0.2}>
-                        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight max-w-3xl mx-auto leading-[1.1]">
+                        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight max-w-3xl mx-auto leading-[1.1] relative z-10">
                             <span className="text-white">Review Dock</span>
                         </h1>
                     </Reveal>

@@ -103,6 +103,21 @@ const AdminPanel = lazy(() => import('./pages/AdminPanel'))
 const PaymentCallback = lazy(() => import('./pages/PaymentCallback'))
 const LandingPage = lazy(() => import('./pages/LandingPage'))
 
+// SEO & Viral Blog Pages
+const GetMoreGoogleReviews = lazy(() => import('./pages/GetMoreGoogleReviews'))
+const ReviewLinkGenerator = lazy(() => import('./pages/ReviewLinkGenerator'))
+const QrCodeReviewSystem = lazy(() => import('./pages/QrCodeReviewSystem'))
+const TrustpilotAlternative = lazy(() => import('./pages/TrustpilotAlternative'))
+const TrickIncreasedReviews = lazy(() => import('./pages/blog/TrickIncreasedReviews'))
+const RestaurantsQrHack = lazy(() => import('./pages/blog/RestaurantsQrHack'))
+
+// Phase 2 SEO Pages
+const GoogleReviewGrowthGuide = lazy(() => import('./pages/GoogleReviewGrowthGuide'))
+const GoogleReviewLinkGenerator = lazy(() => import('./pages/GoogleReviewLinkGenerator'))
+const ReviewCollectionTool = lazy(() => import('./pages/ReviewCollectionTool'))
+const ReputationManagementGuide = lazy(() => import('./pages/ReputationManagementGuide'))
+const ReviewFunnelSystem = lazy(() => import('./pages/ReviewFunnelSystem'))
+
 // Regular imports for lighter pages
 import Login from './pages/Login'
 import Signup from './pages/Signup'
@@ -233,6 +248,21 @@ function AppRoutes() {
                     <AdminPanel />
                 </ProtectedRoute>
             } />
+
+            {/* SEO & Blog Pages */}
+            <Route path="/get-more-google-reviews" element={<GetMoreGoogleReviews />} />
+            <Route path="/review-link-generator" element={<ReviewLinkGenerator />} />
+            <Route path="/qr-code-review-system" element={<QrCodeReviewSystem />} />
+            <Route path="/trustpilot-alternative" element={<TrustpilotAlternative />} />
+            <Route path="/blog/trick-increased-reviews" element={<TrickIncreasedReviews />} />
+            <Route path="/blog/restaurants-qr-hack-more-reviews" element={<RestaurantsQrHack />} />
+
+            {/* Phase 2 SEO Pages */}
+            <Route path="/google-review-growth-guide" element={<GoogleReviewGrowthGuide />} />
+            <Route path="/google-review-link-generator" element={<GoogleReviewLinkGenerator />} />
+            <Route path="/review-collection-tool" element={<ReviewCollectionTool />} />
+            <Route path="/reputation-management-guide" element={<ReputationManagementGuide />} />
+            <Route path="/review-funnel-system" element={<ReviewFunnelSystem />} />
 
             {/* Landing Page */}
             <Route path="/" element={<LandingPage />} />
