@@ -290,6 +290,7 @@ export default function AdminPanel() {
     const [users, setUsers] = useState([])
     const [businesses, setBusinesses] = useState([])
     const [feedbacks, setFeedbacks] = useState([])
+    const [payments, setPayments] = useState([])
 
     // Pagination
     const [usersPage, setUsersPage] = useState(1)
@@ -298,12 +299,16 @@ export default function AdminPanel() {
     const [businessesTotalPages, setBusinessesTotalPages] = useState(1)
     const [feedbacksPage, setFeedbacksPage] = useState(1)
     const [feedbacksTotalPages, setFeedbacksTotalPages] = useState(1)
+    const [paymentsPage, setPaymentsPage] = useState(1)
+    const [paymentsTotalPages, setPaymentsTotalPages] = useState(1)
 
     // Filters
     const [usersSearch, setUsersSearch] = useState('')
     const [businessesSearch, setBusinessesSearch] = useState('')
     const [feedbacksSearch, setFeedbacksSearch] = useState('')
     const [feedbacksType, setFeedbacksType] = useState('all')
+    const [paymentsSearch, setPaymentsSearch] = useState('')
+    const [paymentsStatus, setPaymentsStatus] = useState('all')
 
     // Modals
     const [confirmModal, setConfirmModal] = useState({ show: false })
@@ -372,6 +377,18 @@ export default function AdminPanel() {
         } catch (err) { console.error('Fetch feedbacks error:', err) }
     }, [headers, feedbacksPage, feedbacksType, feedbacksSearch])
 
+    // ── Fetch Payments ──
+    const fetchPayments = useCallback(async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/admin/payments?page=${paymentsPage}&status=${paymentsStatus}&search=${paymentsSearch}`, { headers: headers() })
+            if (res.ok) {
+                const data = await res.json()
+                setPayments(data.payments)
+                setPaymentsTotalPages(data.totalPages)
+            }
+        } catch (err) { console.error('Fetch payments error:', err) }
+    }, [headers, paymentsPage, paymentsStatus, paymentsSearch])
+
     // ── Initial Load ──
     useEffect(() => {
         const load = async () => {
@@ -394,6 +411,10 @@ export default function AdminPanel() {
     useEffect(() => {
         if (activeTab === 'feedbacks') fetchFeedbacks()
     }, [activeTab, fetchFeedbacks])
+
+    useEffect(() => {
+        if (activeTab === 'payments') fetchPayments()
+    }, [activeTab, fetchPayments])
 
     // ── Actions ──
     const handleDeleteUser = (userId, email) => {
@@ -577,6 +598,7 @@ export default function AdminPanel() {
                 <TabBtn active={activeTab === 'users'} label="Users" icon="👥" onClick={() => setActiveTab('users')} />
                 <TabBtn active={activeTab === 'businesses'} label="Businesses" icon="🏢" onClick={() => setActiveTab('businesses')} />
                 <TabBtn active={activeTab === 'feedbacks'} label="Feedbacks" icon="💬" onClick={() => setActiveTab('feedbacks')} />
+                <TabBtn active={activeTab === 'payments'} label="Payments" icon="💵" onClick={() => setActiveTab('payments')} />
             </div>
 
             {/* ══════════════════════════════════ OVERVIEW ══════════════════════════════════ */}
@@ -989,6 +1011,97 @@ export default function AdminPanel() {
                     )}
 
                     <Pagination page={feedbacksPage} totalPages={feedbacksTotalPages} onPageChange={setFeedbacksPage} />
+                </div>
+            )}
+
+            {/* ══════════════════════════════════ PAYMENTS ══════════════════════════════════ */}
+            {activeTab === 'payments' && (
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+                        <SearchInput value={paymentsSearch} onChange={v => { setPaymentsSearch(v); setPaymentsPage(1) }} placeholder="Search by payment reference..." />
+                        
+                        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 4 }}>
+                            {['all', 'created', 'paid', 'failed'].map(t => (
+                                <button
+                                    key={t}
+                                    onClick={() => { setPaymentsStatus(t); setPaymentsPage(1) }}
+                                    style={{
+                                        padding: '6px 14px', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 600, textTransform: 'capitalize', cursor: 'pointer',
+                                        background: paymentsStatus === t ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                        color: paymentsStatus === t ? '#fff' : 'rgba(255,255,255,0.4)',
+                                    }}
+                                >
+                                    {t}
+                                </button>
+                            ))}
+                        </div>
+
+                        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>{payments.length} shown</span>
+                    </div>
+
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr>
+                                    {['Reference', 'Business', 'User', 'Amount', 'Status', 'Created', 'Paid'].map(h => (
+                                        <th
+                                            key={h}
+                                            style={{
+                                                padding: '12px 16px', textAlign: 'left', color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid rgba(255,255,255,0.06)', whiteSpace: 'nowrap',
+                                            }}
+                                        >
+                                            {h}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {payments.map(p => (
+                                    <tr
+                                        key={p.id}
+                                        style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                    >
+                                        <td style={{ padding: '14px 16px', color: '#fff', fontSize: 13, fontFamily: 'monospace' }}>
+                                            {p.reference_id || '—'}
+                                        </td>
+                                        <td style={{ padding: '14px 16px', color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>
+                                            {p.businesses?.name || '—'}
+                                        </td>
+                                        <td style={{ padding: '14px 16px', color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
+                                            {p.users?.email || '—'}
+                                        </td>
+                                        <td style={{ padding: '14px 16px', color: '#fff', fontSize: 13, fontWeight: 500 }}>
+                                            ₹{(p.amount / 100).toLocaleString('en-IN')}
+                                        </td>
+                                        <td style={{ padding: '14px 16px' }}>
+                                            <span style={{
+                                                padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
+                                                background: p.status === 'paid' ? 'rgba(34,197,94,0.1)' : p.status === 'failed' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)',
+                                                color: p.status === 'paid' ? '#4ade80' : p.status === 'failed' ? '#f87171' : 'rgba(255,255,255,0.5)',
+                                                border: '1px solid rgba(255,255,255,0.05)',
+                                            }}>
+                                                {p.status}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '14px 16px', color: 'rgba(255,255,255,0.4)', fontSize: 12, whiteSpace: 'nowrap' }}>
+                                            {new Date(p.created_at).toLocaleDateString()}
+                                        </td>
+                                        <td style={{ padding: '14px 16px', color: 'rgba(255,255,255,0.4)', fontSize: 12, whiteSpace: 'nowrap' }}>
+                                            {p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '—'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {payments.length === 0 && !loading && (
+                        <div style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.3)' }}>No payments found</div>
+                    )}
+
+                    <Pagination page={paymentsPage} totalPages={paymentsTotalPages} onPageChange={setPaymentsPage} />
                 </div>
             )}
 

@@ -470,4 +470,52 @@ router.delete('/feedbacks/:id', async (req, res) => {
     }
 });
 
+// ============================================
+// PAYMENTS MANAGEMENT
+// ============================================
+
+/**
+ * GET /api/admin/payments
+ * List all payments across all businesses
+ */
+router.get('/payments', async (req, res) => {
+    try {
+        const { page = 1, limit = 20, status = 'all', search = '' } = req.query;
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+
+        let query = supabase
+            .from('payments')
+            .select('*, businesses(name), users(email, owner_name)', { count: 'exact' });
+
+        if (status !== 'all') {
+            query = query.eq('status', status);
+        }
+
+        // We can't trivially search relation fields with simple supabase ilike without inner join,
+        // so we'll just do simple filter on reference_id or plan_id for now if search is provided
+        if (search) {
+            query = query.ilike('reference_id', `%${search}%`);
+        }
+
+        const { data: payments, count, error } = await query
+            .order('created_at', { ascending: false })
+            .range(offset, offset + parseInt(limit) - 1);
+
+        if (error) {
+            console.error('Admin payments query error:', error);
+            return res.status(500).json({ error: 'Failed to fetch payments' });
+        }
+
+        res.json({
+            payments: payments || [],
+            total: count || 0,
+            page: parseInt(page),
+            totalPages: Math.ceil((count || 0) / parseInt(limit)),
+        });
+    } catch (error) {
+        console.error('Admin get payments error:', error);
+        res.status(500).json({ error: 'Failed to get payments' });
+    }
+});
+
 export default router;
