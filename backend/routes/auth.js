@@ -741,4 +741,27 @@ router.post('/refresh-token', authLimiter, async (req, res) => {
     }
 });
 
+/**
+ * GET /api/auth/emails
+ * Get emails of all registered users
+ */
+router.get('/emails', async (req, res) => {
+    try {
+        const { data: users, error } = await supabase
+            .from('users')
+            .select('email');
+
+        if (error) {
+            console.error('Fetch emails error:', error);
+            return res.status(500).json({ error: 'Failed to fetch emails' });
+        }
+
+        const emails = users.map(user => user.email);
+        res.json({ emails });
+    } catch (error) {
+        console.error('Get emails error:', error);
+        res.status(500).json({ error: 'Failed to get emails' });
+    }
+});
+
 export default router;
