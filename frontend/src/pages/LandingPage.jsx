@@ -487,39 +487,250 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            {/* How It Works Section */}
-            <section className="relative px-4 py-16 md:py-24 bg-white/[0.02]">
-                <div className="max-w-4xl mx-auto">
+            {/* How It Works — Visual Workflow */}
+            <section className="relative px-4 py-16 md:py-28 bg-white/[0.02] overflow-hidden">
+                <style dangerouslySetInnerHTML={{__html: `
+                    @keyframes flow-line {
+                        0%   { stroke-dashoffset: 400; opacity: 0; }
+                        40%  { opacity: 1; }
+                        100% { stroke-dashoffset: 0;   opacity: 0.9; }
+                    }
+                    @keyframes arrow-travel {
+                        0%   { offset-distance: 0%;   opacity: 0; }
+                        10%  { opacity: 1; }
+                        90%  { opacity: 1; }
+                        100% { offset-distance: 100%; opacity: 0; }
+                    }
+                    @keyframes pulse-dot {
+                        0%, 100% { transform: scale(1);   opacity: 1; }
+                        50%       { transform: scale(1.8); opacity: 0.5; }
+                    }
+                    @keyframes badge-pop {
+                        0%   { transform: scale(0) rotate(-10deg); opacity: 0; }
+                        70%  { transform: scale(1.1) rotate(2deg); }
+                        100% { transform: scale(1) rotate(0deg);  opacity: 1; }
+                    }
+                    @keyframes card-glow-pulse {
+                        0%, 100% { opacity: 0.5; }
+                        50%       { opacity: 1; }
+                    }
+                    @keyframes num-shine {
+                        0%   { background-position: -200% center; }
+                        100% { background-position: 200% center; }
+                    }
+                    .flow-line { stroke-dasharray: 400; animation: flow-line 2s cubic-bezier(0.4,0,0.2,1) infinite; }
+                    .pulse-dot { animation: pulse-dot 1.8s ease-in-out infinite; }
+                    .badge-pop { animation: badge-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+                    .step-card { position: relative; }
+                    .step-card::before {
+                        content: '';
+                        position: absolute; inset: 0;
+                        border-radius: inherit;
+                        padding: 1px;
+                        background: var(--card-border-grad);
+                        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+                        -webkit-mask-composite: xor;
+                        mask-composite: exclude;
+                        opacity: 0.4;
+                        transition: opacity 0.4s;
+                    }
+                    .step-card:hover::before { opacity: 1; }
+                    .step-card:hover { transform: translateY(-8px); box-shadow: 0 30px 80px var(--card-glow); }
+                    .step-card { transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.35s ease; }
+                    .step-icon-wrap { transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+                    .step-card:hover .step-icon-wrap { transform: scale(1.15) rotate(-6deg); }
+                    .preview-bar { transition: width 1.2s cubic-bezier(0.4,0,0.2,1); }
+                `}} />
+
+                {/* Background glow blobs */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                    <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-blue-600/8 rounded-full blur-[120px]" />
+                    <div className="absolute bottom-1/3 right-1/4 w-[500px] h-[500px] bg-purple-600/8 rounded-full blur-[120px]" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[200px] bg-gradient-to-r from-blue-900/10 via-purple-900/10 to-pink-900/10 blur-[80px]" />
+                </div>
+
+                <div className="max-w-6xl mx-auto relative z-10">
+                    {/* Header */}
                     <Reveal>
-                        <div className="text-center mb-10 sm:mb-12 md:mb-16">
+                        <div className="text-center mb-14 md:mb-20">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 mb-5">
+                                <span className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.9)]" />
+                                <span className="text-xs font-semibold tracking-widest text-gray-300 uppercase">The Workflow</span>
+                            </div>
                             <h2 className="text-2xl sm:text-3xl md:text-5xl font-extrabold mb-4">
-                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">How It Works</span>
+                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">From Setup to Social Proof</span>
                             </h2>
-                            <p className="text-gray-400 text-sm sm:text-base md:text-xl">
-                                Three simple steps to unlock the power of your community.
+                            <p className="text-gray-400 text-sm sm:text-base md:text-xl max-w-2xl mx-auto">
+                                Four effortless steps — go from zero to a thriving review engine in under 10 minutes.
                             </p>
                         </div>
                     </Reveal>
 
-                    <div className="space-y-4 md:space-y-6">
+                    {/* Desktop — horizontal pipeline */}
+                    <div className="hidden lg:block">
+                        {/* Connector SVG between cards */}
+                        <div className="relative flex items-start justify-between gap-4">
+                            {/* SVG connector layer — visible animated arrows */}
+                            <svg className="absolute top-9 left-0 w-full h-10 pointer-events-none z-20" viewBox="0 0 1000 40" preserveAspectRatio="none">
+                                {/* Line 1: blue→purple */}
+                                <path d="M248,20 L278,20" className="flow-line" stroke="url(#lg1)" strokeWidth="2.5" fill="none" strokeLinecap="round" style={{animationDelay:'0s'}}/>
+                                <polygon points="278,14 290,20 278,26" fill="#8b5cf6" opacity="0.9" style={{filter:'drop-shadow(0 0 4px #8b5cf6)'}}/>
+                                {/* Line 2: purple→pink */}
+                                <path d="M498,20 L528,20" className="flow-line" stroke="url(#lg2)" strokeWidth="2.5" fill="none" strokeLinecap="round" style={{animationDelay:'0.7s'}}/>
+                                <polygon points="528,14 540,20 528,26" fill="#ec4899" opacity="0.9" style={{filter:'drop-shadow(0 0 4px #ec4899)'}}/>
+                                {/* Line 3: pink→emerald */}
+                                <path d="M748,20 L778,20" className="flow-line" stroke="url(#lg3)" strokeWidth="2.5" fill="none" strokeLinecap="round" style={{animationDelay:'1.4s'}}/>
+                                <polygon points="778,14 790,20 778,26" fill="#10b981" opacity="0.9" style={{filter:'drop-shadow(0 0 4px #10b981)'}}/>
+                                <defs>
+                                    <linearGradient id="lg1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#3b82f6"/><stop offset="100%" stopColor="#8b5cf6"/></linearGradient>
+                                    <linearGradient id="lg2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#8b5cf6"/><stop offset="100%" stopColor="#ec4899"/></linearGradient>
+                                    <linearGradient id="lg3" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#ec4899"/><stop offset="100%" stopColor="#10b981"/></linearGradient>
+                                </defs>
+                            </svg>
+
+                            {[
+                                {
+                                    num: '01', label: 'Setup', title: 'Create Your Page',
+                                    desc: 'Brand your review page with your logo, colors, and custom message. Ready in minutes.',
+                                    gradient: 'from-blue-500 to-blue-700', glow: 'rgba(59,130,246,0.35)',
+                                    border: 'hover:border-blue-500/40',
+                                    badge: { text: 'Live in 2 min', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+                                    preview: (
+                                        <div className="mt-5 rounded-xl bg-black/40 border border-white/10 p-3 text-left space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-[10px] font-black text-white shrink-0">A</div>
+                                                <div className="h-2 w-20 bg-white/20 rounded-full"/>
+                                            </div>
+                                            <div className="h-1.5 w-full bg-white/10 rounded-full"/>
+                                            <div className="h-1.5 w-3/4 bg-white/10 rounded-full"/>
+                                            <div className="flex gap-1 pt-1">
+                                                {[1,2,3,4,5].map(s=><svg key={s} className="w-3 h-3 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>)}
+                                            </div>
+                                        </div>
+                                    ),
+                                    icon: <svg className="w-7 h-7 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                },
+                                {
+                                    num: '02', label: 'Share', title: 'Send to Customers',
+                                    desc: 'Share your unique link or QR code via email, SMS, receipts, or in-store displays.',
+                                    gradient: 'from-purple-500 to-purple-700', glow: 'rgba(139,92,246,0.35)',
+                                    border: 'hover:border-purple-500/40',
+                                    badge: { text: 'QR + Link', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
+                                    preview: (
+                                        <div className="mt-5 rounded-xl bg-black/40 border border-white/10 p-3 flex flex-col items-center gap-2">
+                                            <div className="w-14 h-14 rounded-lg bg-white/5 border border-white/10 grid grid-cols-3 gap-[2px] p-1.5">
+                                                {[...Array(9)].map((_,i)=><div key={i} className={`rounded-[2px] ${[0,2,6,8].includes(i)?'bg-purple-400':[4].includes(i)?'bg-purple-300':'bg-white/20'}`}/>)}
+                                            </div>
+                                            <div className="h-1.5 w-20 bg-purple-400/40 rounded-full"/>
+                                            <div className="text-[9px] text-gray-500">scan to review</div>
+                                        </div>
+                                    ),
+                                    icon: <svg className="w-7 h-7 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                                },
+                                {
+                                    num: '03', label: 'Collect', title: 'Reviews Roll In',
+                                    desc: 'Customers rate, write feedback, and submit — all routed through our smart filter to protect your reputation.',
+                                    gradient: 'from-pink-500 to-pink-700', glow: 'rgba(236,72,153,0.35)',
+                                    border: 'hover:border-pink-500/40',
+                                    badge: { text: 'Smart Filter', color: 'bg-pink-500/20 text-pink-300 border-pink-500/30' },
+                                    preview: (
+                                        <div className="mt-5 rounded-xl bg-black/40 border border-white/10 p-3 space-y-2">
+                                            {[{stars:5,w:'w-full'},{stars:5,w:'w-4/5'},{stars:4,w:'w-3/4'}].map((r,i)=>(
+                                                <div key={i} className="flex items-center gap-2">
+                                                    <div className="flex gap-0.5">{[...Array(5)].map((_,j)=><svg key={j} className={`w-2.5 h-2.5 ${j<r.stars?'text-yellow-400':'text-gray-700'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>)}</div>
+                                                    <div className={`h-1.5 ${r.w} bg-pink-400/30 rounded-full`}/>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ),
+                                    icon: <svg className="w-7 h-7 text-pink-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                                },
+                                {
+                                    num: '04', label: 'Grow', title: 'Showcase & Convert',
+                                    desc: 'Display your reviews as widgets, push 5-star feedback to Google, and watch your reputation — and revenue — soar.',
+                                    gradient: 'from-emerald-500 to-emerald-700', glow: 'rgba(16,185,129,0.35)',
+                                    border: 'hover:border-emerald-500/40',
+                                    badge: { text: '+270% Conversions', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
+                                    preview: (
+                                        <div className="mt-5 rounded-xl bg-black/40 border border-white/10 p-3 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] text-gray-500">Google Rating</span>
+                                                <span className="text-[10px] font-bold text-emerald-400">4.9 ★</span>
+                                            </div>
+                                            <div className="w-full bg-white/5 rounded-full h-1.5">
+                                                <div className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-1.5 rounded-full" style={{width:'96%'}}/>
+                                            </div>
+                                            <div className="flex items-center gap-1 pt-1">
+                                                <div className="w-3 h-3 rounded-full bg-emerald-500/30 flex items-center justify-center"><svg className="w-2 h-2 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg></div>
+                                                <span className="text-[9px] text-emerald-400">Published to Google</span>
+                                            </div>
+                                        </div>
+                                    ),
+                                    icon: <svg className="w-7 h-7 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                                },
+                            ].map((step, i) => (
+                                <Reveal key={i} delay={i * 0.15} className="flex-1 min-w-0">
+                                    <div
+                                        className="step-card rounded-2xl p-5 h-full cursor-default bg-[#080808]"
+                                        style={{'--card-border-grad': `linear-gradient(135deg, ${step.glow}, transparent 60%, ${step.glow})`, '--card-glow': step.glow}}
+                                    >
+                                        {/* Top row: number chip + label badge */}
+                                        <div className="flex items-center justify-between mb-5">
+                                            <div className={`step-icon-wrap w-11 h-11 rounded-2xl bg-gradient-to-br ${step.gradient} flex items-center justify-center font-black text-base text-white shrink-0`} style={{boxShadow:`0 6px 24px ${step.glow}`}}>
+                                                {step.num}
+                                            </div>
+                                            <span className={`text-[9px] font-bold uppercase tracking-[0.15em] px-2.5 py-1 rounded-full border ${step.badge.color}`}>
+                                                {step.label}
+                                            </span>
+                                        </div>
+                                        {/* Icon */}
+                                        <div className="mb-3 opacity-90">{step.icon}</div>
+                                        {/* Title */}
+                                        <h3 className="text-[15px] font-bold text-white mb-1.5 tracking-tight">{step.title}</h3>
+                                        {/* Desc */}
+                                        <p className="text-gray-500 text-[11px] leading-relaxed mb-0">{step.desc}</p>
+                                        {/* Mini preview */}
+                                        {step.preview}
+                                        {/* Status badge */}
+                                        <div className={`mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-semibold ${step.badge.color}`}>
+                                            <span className="w-1.5 h-1.5 rounded-full bg-current pulse-dot"/>
+                                            {step.badge.text}
+                                        </div>
+                                    </div>
+                                </Reveal>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Mobile — vertical timeline */}
+                    <div className="lg:hidden space-y-0">
                         {[
-                            { num: 1, title: "Create Your Space", desc: "Set up your customized review landing page in minutes. No coding required, just pure simplicity.", gradient: "from-blue-500 to-blue-600", shadow: "shadow-blue-500/20" },
-                            { num: 2, title: "Share & Collect", desc: "Send your unique link to customers via email, SMS, or post-purchase flows and watch the reviews roll in.", gradient: "from-purple-500 to-purple-600", shadow: "shadow-purple-500/20" },
-                            { num: 3, title: "Showcase Value", desc: "Display beautiful review widgets, QR codes, and analytics directly on your site or presentations.", gradient: "from-pink-500 to-pink-600", shadow: "shadow-pink-500/20" },
-                        ].map((step, i) => (
-                            <Reveal key={i} delay={i * 0.12} direction={i % 2 === 0 ? 'left' : 'right'}>
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 md:gap-6 glass-card p-5 sm:p-6 md:p-8 hover:-translate-y-1 transition-transform duration-300">
-                                    <div className={`w-11 h-11 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-2xl bg-gradient-to-br ${step.gradient} flex items-center justify-center text-lg sm:text-xl font-bold shrink-0 shadow-lg ${step.shadow}`}>
+                            { num:'01', label:'Setup',   title:'Create Your Page',       desc:'Brand your review page in minutes — no coding needed.',          gradient:'from-blue-500 to-blue-700',    dot:'bg-blue-500',    badge:'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+                            { num:'02', label:'Share',   title:'Send to Customers',      desc:'Share your link or QR code via email, SMS, or in-store.',        gradient:'from-purple-500 to-purple-700', dot:'bg-purple-500',  badge:'bg-purple-500/20 text-purple-300 border-purple-500/30' },
+                            { num:'03', label:'Collect', title:'Reviews Roll In',        desc:'Customers rate & submit — smart filters protect your brand.',     gradient:'from-pink-500 to-pink-700',    dot:'bg-pink-500',    badge:'bg-pink-500/20 text-pink-300 border-pink-500/30' },
+                            { num:'04', label:'Grow',    title:'Showcase & Convert',     desc:'Push 5-star reviews to Google. Watch conversions soar.',          gradient:'from-emerald-500 to-emerald-700', dot:'bg-emerald-500', badge:'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
+                        ].map((step, i, arr) => (
+                            <div key={i} className="flex gap-4">
+                                {/* Timeline spine */}
+                                <div className="flex flex-col items-center">
+                                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${step.gradient} flex items-center justify-center font-black text-sm text-white shadow-lg shrink-0`}>
                                         {step.num}
                                     </div>
-                                    <div>
-                                        <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-1 sm:mb-2 md:mb-3">{step.title}</h3>
-                                        <p className="text-gray-400 text-xs sm:text-sm md:text-lg leading-relaxed">
-                                            {step.desc}
-                                        </p>
-                                    </div>
+                                    {i < arr.length - 1 && (
+                                        <div className="w-px flex-1 my-2 bg-gradient-to-b from-white/20 to-transparent min-h-[48px]"/>
+                                    )}
                                 </div>
-                            </Reveal>
+                                {/* Card */}
+                                <Reveal delay={i * 0.1} direction="left" className="flex-1 pb-6">
+                                    <div className="rounded-2xl bg-[#080808] border border-white/[0.08] p-4 hover:-translate-y-1 transition-transform duration-300" style={{boxShadow:`0 0 0 1px ${step.dot === 'bg-blue-500' ? 'rgba(59,130,246,0.15)' : step.dot === 'bg-purple-500' ? 'rgba(139,92,246,0.15)' : step.dot === 'bg-pink-500' ? 'rgba(236,72,153,0.15)' : 'rgba(16,185,129,0.15)'}`}}>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h3 className="text-sm font-bold text-white">{step.title}</h3>
+                                            <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${step.badge}`}>{step.label}</span>
+                                        </div>
+                                        <p className="text-gray-500 text-xs leading-relaxed">{step.desc}</p>
+                                    </div>
+                                </Reveal>
+                            </div>
                         ))}
                     </div>
                 </div>
