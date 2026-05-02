@@ -102,6 +102,7 @@ const Analytics = lazy(() => import('./pages/Analytics'))
 const AdminPanel = lazy(() => import('./pages/AdminPanel'))
 const PaymentCallback = lazy(() => import('./pages/PaymentCallback'))
 const LandingPage = lazy(() => import('./pages/LandingPage'))
+const FaqPage = lazy(() => import('./pages/FaqPage'))
 
 // SEO & Viral Blog Pages
 const GetMoreGoogleReviews = lazy(() => import('./pages/GetMoreGoogleReviews'))
@@ -266,6 +267,7 @@ function AppRoutes() {
 
             {/* Landing Page */}
             <Route path="/" element={<LandingPage />} />
+            <Route path="/faq" element={<FaqPage />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
     )

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { reviewDockFaqs } from '../data/reviewDockFaqs';
 
 // Scroll-triggered animation hook
 function useScrollReveal(options = {}) {
@@ -17,7 +18,7 @@ function useScrollReveal(options = {}) {
                     observer.unobserve(el);
                 }
             },
-            { threshold: 0.12, rootMargin: '0px 0px -40px 0px', ...options }
+            { threshold: 0, rootMargin: '0px 0px -40px 0px', ...options }
         );
         observer.observe(el);
         return () => observer.disconnect();
@@ -243,38 +244,14 @@ function ReviewDemo() {
 }
 
 export default function LandingPage() {
-    const { user, loading } = useAuth();
+    const { user } = useAuth();
     const navigate = useNavigate();
     const [openFaq, setOpenFaq] = useState(0);
-
-    const faqs = [
-        {
-            question: "What exactly does Review Dock do?",
-            answer: "Review Dock centralizes your customer feedback, allowing you to easily request, manage, and showcase verified reviews across your website and marketing channels to build immediate trust."
-        },
-        {
-            question: "Is this just another review widget?",
-            answer: "No, Review Dock is a complete feedback operating system. We provide smart Google Review redirects, AI sentiment analysis, and customized QR codes to ensure you capture positive feedback where it matters most."
-        },
-        {
-            question: "What happens after I sign up?",
-            answer: "You can instantly create a custom review collection page and start sharing your link or QR code with customers. New reviews will automatically appear in your central dashboard."
-        },
-        {
-            question: "Can Review Dock actually drive revenue?",
-            answer: "Absolutely. Products with authentic, verified reviews see up to a 270% increase in conversion rates. By showcasing social proof, you reduce buyer hesitation and drive more sales."
-        },
-        {
-            question: "Is there a free plan available?",
-            answer: "Yes! We offer a completely free plan that includes up to 50 feedbacks per month and custom QR code generation so you can start building trust risk-free."
-        }
-    ];
+    const faqs = reviewDockFaqs;
 
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
-
-    if (loading) return null;
 
     return (
         <main className="min-h-screen bg-black overflow-x-hidden text-white font-sans relative">
@@ -1045,7 +1022,7 @@ export default function LandingPage() {
             </section>
 
             {/* FAQ Section */}
-            <section className="relative px-4 py-16 sm:py-20 md:py-24 border-t border-white/5 bg-black">
+            <section className="relative px-4 py-16 sm:py-20 md:py-24 border-t border-white/10 bg-[#070a12]">
                 <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-10 sm:gap-12 lg:gap-24">
                     {/* Left content */}
                     <Reveal className="lg:w-1/2 flex flex-col justify-start" direction="right">
@@ -1085,34 +1062,50 @@ export default function LandingPage() {
                     </Reveal>
 
                     {/* Right accordion */}
-                    <Reveal className="lg:w-1/2 flex flex-col" delay={0.2} direction="left">
-                        {faqs.map((faq, index) => {
+                    <Reveal className="lg:w-1/2 flex flex-col rounded-2xl border border-white/10 bg-[#0f1420] p-3 sm:p-5 shadow-2xl shadow-black/30" delay={0.2} direction="left">
+                        {faqs.slice(0, 5).map((faq, index) => {
                             const isOpen = openFaq === index;
+                            const showCategory = index === 0 || faq.category !== faqs[index - 1].category;
                             return (
-                                <div key={index} className="border-b border-white/10 last:border-0">
-                                    <button 
-                                        className="w-full py-4 sm:py-5 md:py-6 flex items-center justify-between text-left focus:outline-none group"
-                                        onClick={() => setOpenFaq(isOpen ? -1 : index)}
-                                    >
-                                        <span className={`text-sm sm:text-base md:text-lg lg:text-xl font-medium transition-colors duration-300 ${isOpen ? 'text-[#8b5cf6]' : 'text-white group-hover:text-gray-300'}`}>
-                                            {faq.question}
-                                        </span>
-                                        <div className="ml-3 sm:ml-4 shrink-0 transition-transform duration-300 flex items-center justify-center">
-                                            <svg className={`w-4 h-4 sm:w-5 sm:h-5 transition-all duration-300 ${isOpen ? 'text-[#8b5cf6] rotate-180' : 'text-gray-500 group-hover:text-gray-300'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                            </svg>
+                                <React.Fragment key={`${faq.category}-${faq.question}`}>
+                                    {showCategory && (
+                                        <h3 className="px-2 pt-7 pb-3 text-xs sm:text-sm font-bold uppercase tracking-[0.18em] text-[#a78bfa] first:pt-2">
+                                            {faq.category}
+                                        </h3>
+                                    )}
+                                    <div className={`mb-2 rounded-xl border transition-colors duration-300 ${isOpen ? 'border-[#8b5cf6]/45 bg-white/[0.07]' : 'border-white/10 bg-white/[0.035] hover:bg-white/[0.06]'}`}>
+                                        <button 
+                                            className="w-full px-4 py-4 sm:px-5 sm:py-5 flex items-center justify-between text-left focus:outline-none group"
+                                            onClick={() => setOpenFaq(isOpen ? -1 : index)}
+                                        >
+                                            <span className={`text-sm sm:text-base md:text-lg font-semibold transition-colors duration-300 ${isOpen ? 'text-white' : 'text-gray-100 group-hover:text-white'}`}>
+                                                {faq.question}
+                                            </span>
+                                            <div className="ml-3 sm:ml-4 shrink-0 transition-transform duration-300 flex items-center justify-center">
+                                                <svg className={`w-4 h-4 sm:w-5 sm:h-5 transition-all duration-300 ${isOpen ? 'text-[#8b5cf6] rotate-180' : 'text-gray-500 group-hover:text-gray-300'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </div>
+                                        </button>
+                                        <div 
+                                            className={`overflow-hidden transition-all duration-400 ease-in-out ${isOpen ? 'max-h-[520px] opacity-100 pb-4 sm:pb-5' : 'max-h-0 opacity-0 pb-0'}`}
+                                        >
+                                            <p className="px-4 sm:px-5 text-gray-300 text-xs sm:text-sm md:text-base leading-relaxed">
+                                                {faq.answer}
+                                            </p>
                                         </div>
-                                    </button>
-                                    <div 
-                                        className={`overflow-hidden transition-all duration-400 ease-in-out ${isOpen ? 'max-h-96 opacity-100 mb-4 sm:mb-6' : 'max-h-0 opacity-0 mb-0'}`}
-                                    >
-                                        <p className="text-gray-400 text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed pr-6 sm:pr-8">
-                                            {faq.answer}
-                                        </p>
                                     </div>
-                                </div>
+                                </React.Fragment>
                             );
                         })}
+                        <div className="mt-8 flex justify-center lg:justify-start">
+                            <Link to="/faq" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-600/20 border border-purple-500/30 text-white font-semibold hover:bg-white/10 hover:border-purple-500/50 transition-all shadow-[0_0_15px_rgba(139,92,246,0.15)] group">
+                                View All FAQs
+                                <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                </svg>
+                            </Link>
+                        </div>
                     </Reveal>
                 </div>
             </section>
