@@ -103,6 +103,9 @@ const AdminPanel = lazy(() => import('./pages/AdminPanel'))
 const PaymentCallback = lazy(() => import('./pages/PaymentCallback'))
 const LandingPage = lazy(() => import('./pages/LandingPage'))
 const FaqPage = lazy(() => import('./pages/FaqPage'))
+const WebsiteTestingReport = lazy(() => import('./pages/WebsiteTestingReport'))
+const BusinessIdeaGenerator = lazy(() => import('./pages/BusinessIdeaGenerator'))
+const BusinessFailureStories = lazy(() => import('./pages/BusinessFailureStories'))
 
 // SEO & Viral Blog Pages
 const GetMoreGoogleReviews = lazy(() => import('./pages/GetMoreGoogleReviews'))
@@ -257,6 +260,7 @@ function AppRoutes() {
             <Route path="/trustpilot-alternative" element={<TrustpilotAlternative />} />
             <Route path="/blog/trick-increased-reviews" element={<TrickIncreasedReviews />} />
             <Route path="/blog/restaurants-qr-hack-more-reviews" element={<RestaurantsQrHack />} />
+            <Route path="/blog/business-failure-case-studies" element={<BusinessFailureStories />} />
 
             {/* Phase 2 SEO Pages */}
             <Route path="/google-review-growth-guide" element={<GoogleReviewGrowthGuide />} />
@@ -264,6 +268,8 @@ function AppRoutes() {
             <Route path="/review-collection-tool" element={<ReviewCollectionTool />} />
             <Route path="/reputation-management-guide" element={<ReputationManagementGuide />} />
             <Route path="/review-funnel-system" element={<ReviewFunnelSystem />} />
+            <Route path="/website-testing-report" element={<WebsiteTestingReport />} />
+            <Route path="/business-idea-generator" element={<BusinessIdeaGenerator />} />
 
             {/* Landing Page */}
             <Route path="/" element={<LandingPage />} />

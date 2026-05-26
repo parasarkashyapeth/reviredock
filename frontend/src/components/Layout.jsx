@@ -155,6 +155,8 @@ export default function Layout({ children }) {
     const navigate = useNavigate()
     const [showProfileDropdown, setShowProfileDropdown] = useState(false)
     const profileDropdownRef = useRef(null)
+    const [showToolsDropdown, setShowToolsDropdown] = useState(false)
+    const toolsDropdownRef = useRef(null)
     const [newFeedbackCount, setNewFeedbackCount] = useState(0)
 
     // Fetch new feedback count (last 24h unreplied) — poll every 60s, pause when tab hidden
@@ -207,6 +209,17 @@ export default function Layout({ children }) {
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
+    // Close tools dropdown on outside click
+    useEffect(() => {
+        const handle = (e) => {
+            if (toolsDropdownRef.current && !toolsDropdownRef.current.contains(e.target)) {
+                setShowToolsDropdown(false)
+            }
+        }
+        document.addEventListener('mousedown', handle)
+        return () => document.removeEventListener('mousedown', handle)
+    }, [])
+
     const handleLogout = () => {
         logout()
         navigate('/login')
@@ -231,6 +244,12 @@ export default function Layout({ children }) {
         }
         return items
     }, [newFeedbackCount, user?.isAdmin])
+
+    const toolItems = [
+        { path: '/website-testing-report', label: 'Website Audit', icon: '🔍', desc: 'Free scan + ₹599 full report', color: '#06b6d4' },
+        { path: '/business-idea-generator', label: 'Business Ideas', icon: '💡', desc: 'Find your perfect side hustle', color: '#a78bfa' },
+        { path: '/blog/business-failure-case-studies', label: 'Case Studies', icon: '📉', desc: '12 real failure breakdowns', color: '#fb7185' },
+    ]
 
     return (
         <div className="min-h-screen bg-black relative overflow-hidden">
@@ -330,6 +349,106 @@ export default function Layout({ children }) {
                                     </span>
                                 </NavLink>
                             ))}
+
+                            <div className="h-6 w-px bg-white/20 mx-2"></div>
+
+                            {/* Free Tools — single dropdown button */}
+                            <div ref={toolsDropdownRef} style={{ position: 'relative', zIndex: 200 }}>
+                                <button
+                                    onClick={() => setShowToolsDropdown(o => !o)}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: 6,
+                                        padding: '7px 14px', borderRadius: 12, cursor: 'pointer',
+                                        fontSize: 13, fontWeight: 700,
+                                        transition: 'all .22s ease',
+                                        background: showToolsDropdown
+                                            ? 'linear-gradient(135deg,rgba(6,182,212,.18),rgba(167,139,250,.14))'
+                                            : 'rgba(255,255,255,.05)',
+                                        border: showToolsDropdown
+                                            ? '1px solid rgba(6,182,212,.4)'
+                                            : '1px solid rgba(255,255,255,.12)',
+                                        color: showToolsDropdown ? '#fff' : 'rgba(255,255,255,.72)',
+                                        boxShadow: showToolsDropdown ? '0 0 18px rgba(6,182,212,.18)' : 'none',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    <span style={{ fontSize: 14 }}>🛠️</span>
+                                    <span>Free Tools</span>
+                                    <span style={{
+                                        fontSize: 9, marginLeft: 2, opacity: .7,
+                                        transform: showToolsDropdown ? 'rotate(180deg)' : 'none',
+                                        transition: 'transform .2s',
+                                        display: 'inline-block',
+                                    }}>▼</span>
+                                </button>
+
+                                {/* Dropdown panel */}
+                                {showToolsDropdown && (
+                                    <div style={{
+                                        position: 'absolute', top: 'calc(100% + 10px)', left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        width: 230,
+                                        background: 'rgba(6,10,20,.97)',
+                                        border: '1px solid rgba(255,255,255,.1)',
+                                        borderRadius: 16,
+                                        padding: '8px',
+                                        boxShadow: '0 24px 48px rgba(0,0,0,.7), 0 0 40px rgba(6,182,212,.06)',
+                                        animation: 'dropdownFadeIn .18s ease',
+                                        backdropFilter: 'blur(20px)',
+                                    }}>
+                                        {/* Caret notch */}
+                                        <div style={{
+                                            position: 'absolute', top: -6, left: '50%',
+                                            transform: 'translateX(-50%)',
+                                            width: 12, height: 12,
+                                            background: 'rgba(6,10,20,.97)',
+                                            border: '1px solid rgba(255,255,255,.1)',
+                                            borderBottom: 'none', borderRight: 'none',
+                                            rotate: '45deg',
+                                        }} />
+                                        <p style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,.22)', textTransform: 'uppercase', letterSpacing: '.18em', padding: '4px 10px 8px', margin: 0 }}>Free tools</p>
+                                        {toolItems.map(tool => (
+                                            <NavLink
+                                                key={tool.path}
+                                                to={tool.path}
+                                                onClick={() => setShowToolsDropdown(false)}
+                                                style={({ isActive }) => ({
+                                                    display: 'flex', alignItems: 'center', gap: 10,
+                                                    padding: '9px 12px', borderRadius: 10,
+                                                    textDecoration: 'none', marginBottom: 4,
+                                                    fontSize: 13, fontWeight: 700,
+                                                    color: isActive ? tool.color : 'rgba(255,255,255,.72)',
+                                                    background: isActive ? `${tool.color}12` : 'transparent',
+                                                    border: `1px solid ${isActive ? tool.color + '30' : 'transparent'}`,
+                                                    transition: 'all .15s',
+                                                })}
+                                                onMouseEnter={e => {
+                                                    e.currentTarget.style.background = `${tool.color}10`
+                                                    e.currentTarget.style.color = '#fff'
+                                                    e.currentTarget.style.transform = 'translateX(2px)'
+                                                }}
+                                                onMouseLeave={e => {
+                                                    e.currentTarget.style.background = 'transparent'
+                                                    e.currentTarget.style.color = 'rgba(255,255,255,.72)'
+                                                    e.currentTarget.style.transform = 'none'
+                                                }}
+                                            >
+                                                <span style={{
+                                                    width: 30, height: 30, borderRadius: 9, flexShrink: 0,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: 15,
+                                                    background: `${tool.color}14`,
+                                                    border: `1px solid ${tool.color}30`,
+                                                }}>{tool.icon}</span>
+                                                <div>
+                                                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, lineHeight: 1.2 }}>{tool.label}</p>
+                                                    <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,.35)', fontWeight: 500, lineHeight: 1.4 }}>{tool.desc}</p>
+                                                </div>
+                                            </NavLink>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
 
                             <div className="h-6 w-px bg-white/20 mx-2"></div>
 
@@ -615,16 +734,14 @@ export default function Layout({ children }) {
                         </div>
 
                         {/* Links */}
-                        <div className="flex items-center gap-6 text-sm">
-                            <NavLink to="/dashboard" className="footer-link text-white/80">
-                                Dashboard
-                            </NavLink>
-                            <NavLink to="/analytics" className="footer-link text-white/80">
-                                Analytics
-                            </NavLink>
-                            <NavLink to="/pricing" className="footer-link text-white/80">
-                                Pricing
-                            </NavLink>
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm justify-center md:justify-start">
+                            <NavLink to="/dashboard" className="footer-link text-white/80">Dashboard</NavLink>
+                            <NavLink to="/analytics" className="footer-link text-white/80">Analytics</NavLink>
+                            <NavLink to="/pricing" className="footer-link text-white/80">Pricing</NavLink>
+                            <div className="w-px h-4 bg-white/15 hidden md:block" />
+                            <NavLink to="/website-testing-report" className="footer-link" style={{ color: 'rgba(6,182,212,0.8)' }}>Website Audit</NavLink>
+                            <NavLink to="/business-idea-generator" className="footer-link" style={{ color: 'rgba(167,139,250,0.8)' }}>Business Ideas</NavLink>
+                            <NavLink to="/blog/business-failure-case-studies" className="footer-link" style={{ color: 'rgba(251,113,133,0.8)' }}>Case Studies</NavLink>
                         </div>
 
                         {/* Copyright */}

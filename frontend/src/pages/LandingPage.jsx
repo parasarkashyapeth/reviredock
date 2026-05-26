@@ -312,6 +312,12 @@ export default function LandingPage() {
                             100xSolutions
                         </a>
                         <div className="flex flex-wrap justify-center gap-2 sm:gap-3 md:gap-4">
+                            <Link to="/website-testing-report" className="px-4 py-2 md:px-5 md:py-2.5 rounded-xl text-cyan-200 font-semibold hover:bg-white/10 transition-all text-xs sm:text-sm border border-cyan-300/20 hover:border-cyan-300/40">
+                                Website Audit
+                            </Link>
+                            <Link to="/blog/business-failure-case-studies" className="px-4 py-2 md:px-5 md:py-2.5 rounded-xl text-gray-300 font-semibold hover:bg-white/10 transition-all text-xs sm:text-sm border border-transparent hover:border-white/20">
+                                Business Stories
+                            </Link>
                             {user ? (
                                 <Link to="/dashboard" className="px-4 py-2 md:px-5 md:py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold hover:opacity-90 transition-all text-xs sm:text-sm">
                                     Go to Dashboard
@@ -848,6 +854,54 @@ export default function LandingPage() {
                 </div>
             </section>
 
+            {/* Website Testing Report Section */}
+            <section className="relative px-4 py-16 sm:py-20 md:py-24 border-t border-white/10 bg-[#05070d]">
+                <div className="max-w-7xl mx-auto grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+                    <Reveal direction="right">
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-400/10 border border-cyan-400/20 w-max mb-4 sm:mb-6">
+                            <span className="w-2 h-2 rounded-full bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.8)]"></span>
+                            <span className="text-[10px] sm:text-xs font-semibold tracking-wide text-cyan-100">NEW SERVICE</span>
+                        </div>
+                        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold mb-4 sm:mb-6 leading-tight tracking-tight text-white">
+                            Website testing reports for growing brands.
+                        </h2>
+                        <p className="text-gray-300 text-sm sm:text-base md:text-lg leading-relaxed max-w-xl">
+                            Submit any live website URL and get a basic instant report with SEO, UX, performance, feature, and improvement insights. Upgrade to a complete human-reviewed report delivered within 24 to 48 hours for {"\u20B9"}599 per website.
+                        </p>
+                        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                            <Link to="/website-testing-report" className="px-6 py-3 rounded-xl bg-cyan-300 text-black font-bold text-center hover:bg-cyan-200 transition-colors">
+                                Test a Website
+                            </Link>
+                            <Link to="/business-idea-generator" className="px-6 py-3 rounded-xl border border-white/10 text-white font-bold text-center hover:bg-white/10 transition-colors">
+                                Try Idea Generator
+                            </Link>
+                        </div>
+                    </Reveal>
+
+                    <Reveal delay={0.15} direction="left">
+                        <div className="rounded-3xl border border-white/10 bg-[#0f1420] p-5 sm:p-6 shadow-2xl shadow-cyan-950/20">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                {[
+                                    ["SEO", "Titles, schema, internal links, content depth"],
+                                    ["UX", "CTA clarity, mobile layout, trust signals"],
+                                    ["Performance", "Media weight, scripts, loading priority"],
+                                    ["Competitors", "Positioning, offers, proof, feature gaps"]
+                                ].map(([title, body]) => (
+                                    <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                                        <p className="text-lg font-bold text-white">{title}</p>
+                                        <p className="mt-2 text-sm leading-6 text-gray-300">{body}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4">
+                                <p className="text-sm font-bold text-cyan-100">Popup CTA</p>
+                                <p className="mt-2 text-sm leading-6 text-gray-300">"Submit your live website URL - we will test it and provide a complete website testing report within 24 to 48 hours."</p>
+                            </div>
+                        </div>
+                    </Reveal>
+                </div>
+            </section>
+
             {/* Pricing Section */}
             <section className="relative px-4 py-16 sm:py-20 md:py-24 border-t border-white/5">
                 <div className="max-w-6xl mx-auto">
@@ -1109,6 +1163,93 @@ export default function LandingPage() {
                     </Reveal>
                 </div>
             </section>
+
+            {/* ── Free Tools Section ── */}
+            <Reveal>
+                <section className="relative px-4 py-16 md:py-24 border-t border-white/5 overflow-hidden">
+                    {/* Background glow */}
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                        <div className="absolute top-1/2 left-1/4 w-96 h-96 bg-cyan-600/6 rounded-full blur-[120px]" />
+                        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-600/6 rounded-full blur-[120px]" />
+                    </div>
+
+                    <div className="max-w-6xl mx-auto relative z-10">
+                        <div className="text-center mb-12">
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 mb-5">
+                                <span className="w-2 h-2 rounded-full bg-cyan-400" style={{ boxShadow: '0 0 8px rgba(6,182,212,0.9)', animation: 'pulse-glow 2s ease-in-out infinite' }} />
+                                <span className="text-xs font-semibold tracking-widest text-cyan-300 uppercase">Free Tools</span>
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl md:text-5xl font-extrabold mb-4">
+                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-500">
+                                    Grow your business smarter
+                                </span>
+                            </h2>
+                            <p className="text-gray-400 text-sm sm:text-base md:text-lg max-w-2xl mx-auto">
+                                Free tools to test, improve, and build — no signup required.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            {/* Tool 1 — Website Testing */}
+                            <Link to="/website-testing-report" style={{ textDecoration: 'none' }}>
+                                <div className="group glass-card p-6 hover:border-cyan-500/30 hover:-translate-y-1 transition-all duration-300 cursor-pointer h-full" style={{ borderColor: 'rgba(6,182,212,0.15)' }}>
+                                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5 text-2xl group-hover:scale-110 transition-transform duration-300" style={{ background: 'rgba(6,182,212,0.12)', border: '1px solid rgba(6,182,212,0.25)' }}>
+                                        🔍
+                                    </div>
+                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold mb-4" style={{ background: 'rgba(6,182,212,0.1)', color: '#67e8f9', border: '1px solid rgba(6,182,212,0.25)' }}>
+                                        Free instant scan · ₹599 full audit
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white mb-2">Website Testing Report</h3>
+                                    <p className="text-gray-400 text-sm leading-relaxed mb-5">
+                                        Enter any URL and get an instant score across SEO, UX, performance, features and competitors. Full expert audit delivered in 24–48 hours.
+                                    </p>
+                                    <span className="text-cyan-400 text-sm font-semibold flex items-center gap-1 group-hover:gap-2 transition-all">
+                                        Test your website →
+                                    </span>
+                                </div>
+                            </Link>
+
+                            {/* Tool 2 — Business Idea Generator */}
+                            <Link to="/business-idea-generator" style={{ textDecoration: 'none' }}>
+                                <div className="group glass-card p-6 hover:border-purple-500/30 hover:-translate-y-1 transition-all duration-300 cursor-pointer h-full" style={{ borderColor: 'rgba(167,139,250,0.15)' }}>
+                                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5 text-2xl group-hover:scale-110 transition-transform duration-300" style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.25)' }}>
+                                        💡
+                                    </div>
+                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold mb-4" style={{ background: 'rgba(167,139,250,0.1)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.25)' }}>
+                                        Searchiva · Business Advisor
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white mb-2">Business Idea Generator</h3>
+                                    <p className="text-gray-400 text-sm leading-relaxed mb-5">
+                                        Tell us your situation and skills. We'll suggest realistic side hustles, business ideas, and income sources with roadmaps and income estimates.
+                                    </p>
+                                    <span className="text-purple-400 text-sm font-semibold flex items-center gap-1 group-hover:gap-2 transition-all">
+                                        Generate my ideas →
+                                    </span>
+                                </div>
+                            </Link>
+
+                            {/* Tool 3 — Business Failure Stories */}
+                            <Link to="/blog/business-failure-case-studies" style={{ textDecoration: 'none' }}>
+                                <div className="group glass-card p-6 hover:border-pink-500/30 hover:-translate-y-1 transition-all duration-300 cursor-pointer h-full" style={{ borderColor: 'rgba(251,113,133,0.15)' }}>
+                                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5 text-2xl group-hover:scale-110 transition-transform duration-300" style={{ background: 'rgba(251,113,133,0.12)', border: '1px solid rgba(251,113,133,0.25)' }}>
+                                        📉
+                                    </div>
+                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold mb-4" style={{ background: 'rgba(251,113,133,0.1)', color: '#fda4af', border: '1px solid rgba(251,113,133,0.25)' }}>
+                                        100xSolutions Blog · 12 case studies
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white mb-2">Business Failure Stories</h3>
+                                    <p className="text-gray-400 text-sm leading-relaxed mb-5">
+                                        Deep-dive case studies of companies like Theranos, WeWork, Quibi, and Vine — what went wrong, why they failed, and what founders can learn.
+                                    </p>
+                                    <span className="text-pink-400 text-sm font-semibold flex items-center gap-1 group-hover:gap-2 transition-all">
+                                        Read case studies →
+                                    </span>
+                                </div>
+                            </Link>
+                        </div>
+                    </div>
+                </section>
+            </Reveal>
 
             {/* Final CTA Section */}
             <Reveal>
