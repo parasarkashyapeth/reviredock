@@ -12,6 +12,10 @@ if (typeof document !== 'undefined' && !document.getElementById(KF)) {
         @keyframes bigFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
         @keyframes bigShimmer{0%{background-position:200% center}100%{background-position:-200% center}}
         @keyframes bigPop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        @keyframes gradientShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+        @keyframes aiPulse{0%,100%{box-shadow:0 0 0 0 rgba(167,139,250,.4)}70%{box-shadow:0 0 0 16px rgba(167,139,250,0)}}
         .big-sit{transition:all .2s;cursor:pointer}
         .big-sit:hover{border-color:rgba(6,182,212,.45)!important;transform:translateY(-2px)}
         .big-skill{transition:all .18s;cursor:pointer;user-select:none}
@@ -20,6 +24,7 @@ if (typeof document !== 'undefined' && !document.getElementById(KF)) {
         .big-idea:hover{border-color:rgba(167,139,250,.4)!important;transform:translateY(-3px);box-shadow:0 20px 40px rgba(0,0,0,.35)}
         .big-cta-btn{transition:all .2s}
         .big-cta-btn:hover{transform:translateY(-1px);opacity:.9}
+        .ai-shimmer{background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.09) 50%,rgba(255,255,255,.04) 75%);background-size:200% 100%;animation:bigShimmer 1.5s ease-in-out infinite}
     `;
     document.head.appendChild(s);
 }
@@ -48,38 +53,113 @@ const SKILLS = [
     { id: 'photography', label: 'Photography', icon: '📸' },
 ];
 
-const IDEAS_DB = {
-    student: [
-        { name: 'Campus Notes Marketplace', icon: '📝', tags: ['writing','teaching'], income: '₹5,000–₹18,000/mo', first: '1–2 weeks', fit: 91, tools: ['Gumroad','Notion','Instagram'], steps: ['Pick 2–3 subjects you excel at and create structured PDF notes','Set up a Gumroad page and price at ₹49–₹99 per subject','Promote in college WhatsApp groups and Telegram'], desc: 'Sell organised study notes and cheatsheets to students. Zero startup cost.' },
-        { name: 'Local Tutoring Service', icon: '🎓', tags: ['teaching'], income: '₹8,000–₹25,000/mo', first: '3–5 days', fit: 88, tools: ['Zoom','WhatsApp','Google Meet'], steps: ['List 2–3 subjects you can teach confidently','Post on neighbourhood Facebook groups and school boards','Offer first session free to build reviews'], desc: 'Tutor school students in your area. High demand, zero overhead, immediate income.' },
-        { name: 'AI Resume Optimizer', icon: '🤖', tags: ['writing','marketing'], income: '₹6,000–₹20,000/mo', first: '1 week', fit: 84, tools: ['ChatGPT','Canva','LinkedIn'], steps: ['Create a sample before/after resume transformation as proof','Offer ₹299–₹599 reviews via DM on LinkedIn','Upsell LinkedIn profile optimisation at ₹999'], desc: 'Use AI tools to rewrite resumes for job seekers. High value, low effort per client.' },
-        { name: 'Social Media Management', icon: '📱', tags: ['marketing','design','video'], income: '₹10,000–₹30,000/mo', first: '2 weeks', fit: 80, tools: ['Canva','Buffer','Instagram'], steps: ['Build 1–2 personal pages to show your content style','Cold pitch 5 local businesses offering a free 2-week trial','Close at ₹3,000–₹8,000/month per client'], desc: 'Manage Instagram and Facebook for local businesses. Recurring, scalable income.' },
-    ],
-    employed: [
-        { name: 'Weekend Consulting Sprints', icon: '🚀', tags: ['sales','finance'], income: '₹15,000–₹50,000/mo', first: '2–3 weeks', fit: 90, tools: ['LinkedIn','Calendly','Zoom'], steps: ['Identify 1 problem you solve daily at work that others struggle with','Create a 90-min consulting sprint offer at ₹2,500–₹5,000','Post on LinkedIn twice a week and DM 10 people weekly'], desc: 'Package your expertise into weekend sessions. Use your 9-to-5 skills to earn on the side.' },
-        { name: 'Niche Newsletter', icon: '📧', tags: ['writing','marketing'], income: '₹5,000–₹40,000/mo', first: '1 month', fit: 86, tools: ['Substack','ConvertKit','Twitter/X'], steps: ['Pick one topic you read about obsessively anyway','Send 4 issues before monetising — build trust first','Add a paid tier at ₹199/mo or sell sponsorships at 500+ subs'], desc: 'Weekly email newsletter on a topic you already follow. Passive recurring income.' },
-        { name: 'No-Code Automation Service', icon: '⚙️', tags: ['dev','data'], income: '₹20,000–₹80,000/mo', first: '3 weeks', fit: 83, tools: ['Zapier','Make','Airtable'], steps: ['Learn Zapier or Make in one weekend (free)','List 5 common business workflows you can automate','Offer automation to SMEs starting at ₹5,000 per setup'], desc: 'Help businesses automate repetitive tasks. No coding needed — huge demand.' },
-        { name: 'LinkedIn Ghostwriting', icon: '✍️', tags: ['writing','marketing'], income: '₹12,000–₹45,000/mo', first: '2 weeks', fit: 81, tools: ['Notion','LinkedIn','Grammarly'], steps: ['Write 30 posts for your own profile to develop a consistent voice','Reach out to founders offering a 2-week free trial','Close at ₹8,000–₹20,000/month per client'], desc: 'Write LinkedIn content for busy founders. One of the highest value per-hour side hustles.' },
-    ],
-    owner: [
-        { name: 'Website Audit & Growth Service', icon: '🔍', tags: ['marketing','dev'], income: '₹25,000–₹1,00,000/mo', first: '1 week', fit: 94, tools: ['ReviewDock','SEMrush','Loom'], steps: ['Create a 5-point audit checklist (SEO, UX, speed, CTA, trust)','Record a 5-min Loom video audit for 10 local websites — send free','Upsell a full audit + implementation at ₹5,000–₹15,000'], desc: 'Offer website audits and growth reporting to other small businesses. High margin.' },
-        { name: 'Review Growth Service', icon: '⭐', tags: ['marketing','sales'], income: '₹20,000–₹60,000/mo', first: '1 week', fit: 90, tools: ['ReviewDock','WhatsApp Business','QR codes'], steps: ['Sign up on ReviewDock and set up your review collection system','Offer it as a service to 10 local businesses at ₹2,500/mo','Add QR code printing as an upsell at ₹500 per location'], desc: 'Use ReviewDock to grow Google reviews for multiple local businesses. Highly recurring.' },
-        { name: 'Local SEO Monthly Package', icon: '📍', tags: ['marketing','writing'], income: '₹30,000–₹90,000/mo', first: '2–3 weeks', fit: 87, tools: ['Google Business','Ubersuggest','ReviewDock'], steps: ['Bundle GMB optimisation + 2 blog posts + monthly report','Price at ₹4,000–₹8,000/month per business','Target restaurants, clinics, and salons — they buy fast'], desc: 'Recurring SEO retainer for local businesses. GMB, local citations, and content.' },
-        { name: 'WhatsApp Retention Flows', icon: '💬', tags: ['marketing','sales'], income: '₹15,000–₹50,000/mo', first: '2 weeks', fit: 82, tools: ['WhatsApp Business API','Wati','Interakt'], steps: ['Learn one WhatsApp automation tool (Wati free trial)','Build a 5-message re-engagement sequence template','Sell to local businesses at ₹3,000–₹8,000 setup + ₹1,500/mo'], desc: 'Build automated WhatsApp sequences that bring back past customers.' },
-    ],
-    freelancer: [
-        { name: 'Digital Template Shop', icon: '🛍️', tags: ['design','dev'], income: '₹8,000–₹40,000/mo', first: '3–4 weeks', fit: 92, tools: ['Gumroad','Figma','Canva'], steps: ['Create 5–10 templates in your niche (Notion, Figma, Canva)','List on Gumroad and Creative Market at ₹199–₹999 each','Drive traffic through Twitter and YouTube tutorials'], desc: 'Sell digital templates passively. Build once, sell forever. Great passive top-up income.' },
-        { name: 'Paid Community / Cohort', icon: '🌐', tags: ['teaching','community'], income: '₹20,000–₹1,50,000/mo', first: '3–4 weeks', fit: 88, tools: ['WhatsApp','Circle','Graphy'], steps: ['Define one outcome your community helps members achieve','Start with a free cohort of 20 people — document everything','Launch paid cohorts at ₹999–₹4,999 per person'], desc: 'Run a structured paid group around your expertise. Highest-margin product you can build.' },
-        { name: 'Content Repurposing Agency', icon: '♻️', tags: ['video','writing','marketing'], income: '₹25,000–₹80,000/mo', first: '1–2 weeks', fit: 85, tools: ['Descript','Opus Clip','Canva'], steps: ['Take one podcast and turn it into 10 short clips + 5 posts','Show the before/after as a case study on LinkedIn','Sell the repurposing retainer at ₹8,000–₹20,000/month'], desc: 'Turn long-form content into short clips and carousels. Creators pay well for this.' },
-        { name: 'Landing Page Audits', icon: '🔎', tags: ['design','marketing'], income: '₹10,000–₹35,000/mo', first: '3–5 days', fit: 80, tools: ['ReviewDock','Loom','Notion'], steps: ['Create a 7-point landing page audit framework','DM 10 creators per day with a quick free tip about their page','Offer paid audits at ₹1,499–₹3,999 per review'], desc: 'Review and improve landing pages for creators and indie makers. Fast delivery, repeat clients.' },
-    ],
-    between: [
-        { name: 'Freelance Project Sprint', icon: '⚡', tags: ['dev','design','writing'], income: '₹20,000–₹60,000/mo', first: '3–7 days', fit: 93, tools: ['Upwork','Fiverr','LinkedIn'], steps: ['Pick your top 1 skill and create a laser-focused Fiverr gig','Price slightly below market — win your first 5 reviews quickly','Raise rates and move to direct clients after month 1'], desc: 'Start freelancing immediately. Best way to generate income fast while figuring out next move.' },
-        { name: 'Micro-SaaS or Tool', icon: '🛠️', tags: ['dev','data'], income: '₹10,000–₹2,00,000/mo', first: '4–8 weeks', fit: 79, tools: ['Bubble','Glide','Supabase'], steps: ['Find a recurring annoyance in your previous job and build a simple fix','Launch on Product Hunt and indie hacker communities','Charge ₹299–₹999/month with a free tier to grow'], desc: 'Build a small software tool solving a specific problem. No-code makes this faster than ever.' },
-        { name: 'Career Pivot Cohort', icon: '🎯', tags: ['teaching','writing'], income: '₹15,000–₹80,000/mo', first: '3–4 weeks', fit: 76, tools: ['Graphy','YouTube','Telegram'], steps: ['Document your journey through your job transition as content','Build an audience around the skill you are pivoting into','Launch a 4-week cohort at ₹2,999–₹6,999 per student'], desc: 'Turn your career pivot into a course. Your story is your marketing.' },
-        { name: 'Industry Consulting', icon: '🤝', tags: ['sales','finance'], income: '₹10,000–₹40,000/mo', first: '1–2 weeks', fit: 73, tools: ['LinkedIn','Calendly','Zoom'], steps: ['Write about why you left your job honestly — LinkedIn loves it','Offer resume + interview coaching to people in the same field','Charge ₹1,999–₹4,999 per coaching package'], desc: 'Your industry experience is valuable to others. Monetise it while you find your next move.' },
-    ],
-};
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
+/* ─── AI Loading Screen ──────────────────────────────────────── */
+const AI_MESSAGES = [
+    '🤖 Analyzing your profile…',
+    '💡 Researching market opportunities…',
+    '📊 Calculating income potential…',
+    '🎯 Matching ideas to your skills…',
+    '✨ Crafting your personalized plan…',
+];
+
+function AILoadingScreen() {
+    const [msgIdx, setMsgIdx] = useState(0);
+
+    React.useEffect(() => {
+        const t = setInterval(() => {
+            setMsgIdx(i => (i + 1) % AI_MESSAGES.length);
+        }, 1400);
+        return () => clearInterval(t);
+    }, []);
+
+    return (
+        <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            minHeight: 420, animation: 'bigFadeUp .4s ease',
+        }}>
+            {/* Animated AI orb */}
+            <div style={{
+                position: 'relative', width: 96, height: 96, marginBottom: 32,
+            }}>
+                <div style={{
+                    width: 96, height: 96, borderRadius: '50%',
+                    background: 'linear-gradient(135deg,#a78bfa,#06b6d4,#e879f9)',
+                    backgroundSize: '200% 200%',
+                    animation: 'gradientShift 2s ease infinite, aiPulse 2s ease-in-out infinite',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 38,
+                }}>🧠</div>
+                {/* Orbiting dot */}
+                <div style={{
+                    position: 'absolute', top: -4, left: '50%', transformOrigin: '0 52px',
+                    animation: 'spin 1.5s linear infinite',
+                    width: 10, height: 10,
+                }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#06b6d4', boxShadow: '0 0 8px #06b6d4' }} />
+                </div>
+            </div>
+
+            <h3 style={{ fontSize: 20, fontWeight: 800, color: '#fff', marginBottom: 10 }}>
+                AI is generating your ideas
+            </h3>
+
+            {/* Animated message */}
+            <p key={msgIdx} style={{
+                fontSize: 14, color: '#a78bfa', fontWeight: 600,
+                animation: 'bigFadeUp .35s ease',
+                marginBottom: 32, minHeight: 22,
+            }}>{AI_MESSAGES[msgIdx]}</p>
+
+            {/* Progress bar */}
+            <div style={{
+                width: 260, height: 4, borderRadius: 4,
+                background: 'rgba(255,255,255,.07)', overflow: 'hidden',
+            }}>
+                <div style={{
+                    height: '100%', borderRadius: 4,
+                    background: 'linear-gradient(90deg,#a78bfa,#06b6d4,#e879f9)',
+                    backgroundSize: '200% 100%',
+                    animation: 'gradientShift 1.5s ease infinite, bigShimmer 2s ease infinite',
+                    width: '100%',
+                }} />
+            </div>
+
+            {/* Skeleton cards */}
+            <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: 14, marginTop: 40, width: '100%', maxWidth: 680,
+            }}>
+                {[0, 1, 2, 3].map(i => (
+                    <div key={i} style={{
+                        borderRadius: 18, overflow: 'hidden',
+                        border: '1px solid rgba(255,255,255,.06)',
+                        background: 'rgba(255,255,255,.02)',
+                        animationDelay: `${i * 0.12}s`,
+                        animation: 'bigFadeUp .4s ease both',
+                    }}>
+                        <div style={{ height: 3, background: 'rgba(167,139,250,.15)' }} />
+                        <div style={{ padding: '18px 20px' }}>
+                            <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+                                <div className="ai-shimmer" style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0 }} />
+                                <div style={{ flex: 1 }}>
+                                    <div className="ai-shimmer" style={{ height: 14, borderRadius: 6, marginBottom: 8 }} />
+                                    <div className="ai-shimmer" style={{ height: 11, borderRadius: 6, width: '75%' }} />
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                                <div className="ai-shimmer" style={{ height: 22, width: 100, borderRadius: 999 }} />
+                                <div className="ai-shimmer" style={{ height: 22, width: 90, borderRadius: 999 }} />
+                            </div>
+                            <div className="ai-shimmer" style={{ height: 11, borderRadius: 6, width: '40%' }} />
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 /* ─── Step indicator ─────────────────────────────────────────── */
 function StepBar({ step, total }) {
@@ -112,8 +192,8 @@ function StepBar({ step, total }) {
 /* ─── Idea Card ──────────────────────────────────────────────── */
 function IdeaCard({ idea, index, skills }) {
     const [open, setOpen] = useState(false);
-    const boost = skills.filter(s => idea.tags.includes(s)).length;
-    const fit = Math.min(99, idea.fit + boost * 2);
+    const boost = skills.filter(s => (idea.tags || []).includes(s)).length;
+    const fit = Math.min(99, (idea.fit || 80) + boost * 2);
     const fitColor = fit >= 88 ? '#10b981' : fit >= 78 ? '#06b6d4' : '#f59e0b';
 
     return (
@@ -146,6 +226,15 @@ function IdeaCard({ idea, index, skills }) {
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#06b6d4', background: 'rgba(6,182,212,.08)', border: '1px solid rgba(6,182,212,.2)', borderRadius: 999, padding: '3px 10px' }}>⚡ First ₹ in {idea.first}</span>
                 </div>
 
+                {/* AI badge */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <span style={{
+                        fontSize: 10, fontWeight: 700, color: '#a78bfa',
+                        background: 'rgba(167,139,250,.1)', border: '1px solid rgba(167,139,250,.2)',
+                        borderRadius: 999, padding: '2px 8px', letterSpacing: '.05em',
+                    }}>✨ AI Generated</span>
+                </div>
+
                 <button onClick={() => setOpen(o => !o)} style={{ fontSize: 12, color: '#a78bfa', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                     {open ? '▲ Hide roadmap' : '▼ 3-step roadmap'}
                 </button>
@@ -153,7 +242,7 @@ function IdeaCard({ idea, index, skills }) {
                 {open && (
                     <div style={{ marginTop: 14, animation: 'bigFadeUp .2s ease' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
-                            {idea.steps.map((st, i) => (
+                            {(idea.steps || []).map((st, i) => (
                                 <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                                     <span style={{
                                         width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
@@ -166,7 +255,7 @@ function IdeaCard({ idea, index, skills }) {
                             ))}
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                            {idea.tools.map(t => (
+                            {(idea.tools || []).map(t => (
                                 <span key={t} style={{ fontSize: 11, color: 'rgba(255,255,255,.38)', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.09)', borderRadius: 6, padding: '2px 8px' }}>{t}</span>
                             ))}
                         </div>
@@ -179,7 +268,7 @@ function IdeaCard({ idea, index, skills }) {
 
 /* ─── Stats bar ──────────────────────────────────────────────── */
 const STATS = [
-    { v: '5', l: 'profile types' }, { v: '20+', l: 'curated ideas' },
+    { v: '5', l: 'profile types' }, { v: 'AI', l: 'powered ideas' },
     { v: '₹0', l: 'required to start' }, { v: '100%', l: 'personalised' },
 ];
 
@@ -191,9 +280,43 @@ export default function BusinessIdeaGenerator() {
     const [time, setTime] = useState('5-10');
     const [budget, setBudget] = useState('low');
     const [results, setResults] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [ideas, setIdeas] = useState([]);
+    const [error, setError] = useState(null);
 
     const toggleSkill = id => setSkills(p => p.includes(id) ? p.filter(s => s !== id) : [...p, id]);
-    const ideas = useMemo(() => sit ? (IDEAS_DB[sit] || []) : [], [sit]);
+
+    const generateIdeas = async () => {
+        setLoading(true);
+        setError(null);
+        setResults(true);
+
+        try {
+            const res = await fetch(`${API_BASE}/api/business/generate-ideas`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    situation: sit,
+                    skills,
+                    timePerWeek: time,
+                    budget,
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to generate ideas');
+            }
+
+            setIdeas(data.ideas || []);
+        } catch (err) {
+            console.error(err);
+            setError(err.message || 'Something went wrong. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const inputStyle = {
         background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)',
@@ -235,7 +358,7 @@ export default function BusinessIdeaGenerator() {
             <section style={{ padding: '72px 32px 0', maxWidth: 860, margin: '0 auto', textAlign: 'center' }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(167,139,250,.09)', border: '1px solid rgba(167,139,250,.28)', borderRadius: 999, padding: '5px 14px', marginBottom: 22 }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#a78bfa', animation: 'bigPulse 2s ease-in-out infinite', display: 'inline-block' }} />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '.18em' }}>Searchiva · Business Advisor</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '.18em' }}>AI-Powered · Business Advisor</span>
                 </div>
 
                 <h1 style={{ fontSize: 'clamp(32px,5vw,58px)', fontWeight: 900, lineHeight: 1.08, letterSpacing: '-.03em', marginBottom: 16 }}>
@@ -245,7 +368,7 @@ export default function BusinessIdeaGenerator() {
                     </span>
                 </h1>
                 <p style={{ fontSize: 18, color: 'rgba(255,255,255,.48)', lineHeight: 1.75, maxWidth: 540, margin: '0 auto 40px' }}>
-                    Tell us your situation and skills. We'll suggest realistic side hustles, business ideas, and income sources — with income estimates, roadmaps, and tools.
+                    Tell us your situation and skills. Our AI generates realistic, personalised side hustles — with income estimates, roadmaps, and tools.
                 </p>
 
                 {/* Stats */}
@@ -300,7 +423,7 @@ export default function BusinessIdeaGenerator() {
                         {step === 1 && (
                             <div style={{ animation: 'bigFadeUp .35s ease' }}>
                                 <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>What are your useful skills?</h2>
-                                <p style={{ fontSize: 14, color: 'rgba(255,255,255,.42)', marginBottom: 24 }}>Select all that apply — we boost your fit score for matching ideas.</p>
+                                <p style={{ fontSize: 14, color: 'rgba(255,255,255,.42)', marginBottom: 24 }}>Select all that apply — AI will boost your fit score for matching ideas.</p>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 28 }}>
                                     {SKILLS.map(sk => {
                                         const sel = skills.includes(sk.id);
@@ -330,7 +453,7 @@ export default function BusinessIdeaGenerator() {
                         {step === 2 && (
                             <div style={{ animation: 'bigFadeUp .35s ease' }}>
                                 <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Time & starting budget</h2>
-                                <p style={{ fontSize: 14, color: 'rgba(255,255,255,.42)', marginBottom: 24 }}>Helps us filter the most realistic ideas for your constraints.</p>
+                                <p style={{ fontSize: 14, color: 'rgba(255,255,255,.42)', marginBottom: 24 }}>Helps AI filter the most realistic ideas for your constraints.</p>
 
                                 <div style={{ marginBottom: 22 }}>
                                     <p style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,.55)', marginBottom: 10 }}>Available time per week</p>
@@ -360,84 +483,133 @@ export default function BusinessIdeaGenerator() {
                                     </div>
                                 </div>
 
+                                {/* AI disclaimer */}
+                                <div style={{
+                                    marginBottom: 20, padding: '12px 16px', borderRadius: 12,
+                                    background: 'rgba(167,139,250,.05)', border: '1px solid rgba(167,139,250,.15)',
+                                    display: 'flex', alignItems: 'center', gap: 10,
+                                }}>
+                                    <span style={{ fontSize: 18 }}>🤖</span>
+                                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,.45)', lineHeight: 1.55 }}>
+                                        Our AI will generate 4 personalised business ideas based on your exact profile. This takes ~10 seconds.
+                                    </p>
+                                </div>
+
                                 <div style={{ display: 'flex', gap: 10 }}>
                                     <button onClick={() => setStep(1)} style={{ ...inputStyle, cursor: 'pointer', padding: '15px 20px', border: 'none' }}>←</button>
-                                    <div style={{ flex: 1 }}>{nextBtn('✨ Generate My Ideas', () => setResults(true))}</div>
+                                    <div style={{ flex: 1 }}>{nextBtn('✨ Generate My Ideas with AI', generateIdeas)}</div>
                                 </div>
                             </div>
                         )}
                     </div>
                 ) : (
                     /* Results */
-                    <div style={{ animation: 'bigPop .4s ease' }}>
-                        {/* Results header */}
-                        <div style={{
-                            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-                            marginBottom: 28, flexWrap: 'wrap', gap: 16,
-                        }}>
-                            <div>
-                                <div style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: 7,
-                                    background: 'rgba(167,139,250,.09)', border: '1px solid rgba(167,139,250,.25)',
-                                    borderRadius: 999, padding: '4px 12px', marginBottom: 10,
-                                }}>
-                                    <span style={{ fontSize: 10, fontWeight: 700, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '.14em' }}>
-                                        Ideas for {SITUATIONS.find(s => s.id === sit)?.icon} {SITUATIONS.find(s => s.id === sit)?.label}
-                                    </span>
-                                </div>
-                                <h2 style={{ fontSize: 28, fontWeight: 900, color: '#fff' }}>{ideas.length} personalised ideas</h2>
-                                <p style={{ fontSize: 14, color: 'rgba(255,255,255,.42)', marginTop: 4 }}>Sorted by fit score. Click any card to reveal the step-by-step roadmap.</p>
+                    <div>
+                        {loading ? (
+                            /* AI Loading */
+                            <div style={{ maxWidth: 720, margin: '0 auto' }}>
+                                <AILoadingScreen />
                             </div>
-                            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                                <button onClick={() => { setResults(false); setStep(0); setSit(null); setSkills([]); }} style={{
-                                    padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                                    background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)',
-                                    borderRadius: 12, color: 'rgba(255,255,255,.65)',
-                                }}>← Start over</button>
-                                <Link to="/website-testing-report" style={{
-                                    padding: '10px 18px', fontSize: 13, fontWeight: 700, textDecoration: 'none',
-                                    background: 'rgba(6,182,212,.1)', border: '1px solid rgba(6,182,212,.28)',
-                                    borderRadius: 12, color: '#06b6d4',
-                                }}>Test your website →</Link>
-                            </div>
-                        </div>
-
-                        {/* Skill boost notice */}
-                        {skills.length > 0 && (
+                        ) : error ? (
+                            /* Error state */
                             <div style={{
-                                marginBottom: 24, padding: '12px 18px', borderRadius: 14,
-                                background: 'rgba(167,139,250,.06)', border: '1px solid rgba(167,139,250,.18)',
-                                display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center',
+                                maxWidth: 480, margin: '60px auto', textAlign: 'center',
+                                animation: 'bigFadeUp .4s ease',
                             }}>
-                                <span style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', fontWeight: 600 }}>Skills boosting your score:</span>
-                                {skills.map(sk => {
-                                    const s = SKILLS.find(o => o.id === sk);
-                                    return s ? <span key={sk} style={{ fontSize: 12, color: '#c4b5fd', fontWeight: 700, background: 'rgba(167,139,250,.12)', borderRadius: 999, padding: '2px 10px' }}>{s.icon} {s.label}</span> : null;
-                                })}
+                                <div style={{ fontSize: 48, marginBottom: 20 }}>⚠️</div>
+                                <h3 style={{ fontSize: 20, fontWeight: 800, color: '#fff', marginBottom: 10 }}>Something went wrong</h3>
+                                <p style={{ fontSize: 14, color: 'rgba(255,255,255,.45)', marginBottom: 28, lineHeight: 1.6 }}>{error}</p>
+                                <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                                    <button onClick={() => { setResults(false); setStep(2); setError(null); }} style={{
+                                        padding: '11px 22px', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                                        background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)',
+                                        borderRadius: 12, color: 'rgba(255,255,255,.65)',
+                                    }}>← Go back</button>
+                                    <button onClick={generateIdeas} style={{
+                                        padding: '11px 22px', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                                        background: 'linear-gradient(135deg,#06b6d4,#a78bfa)',
+                                        border: 'none', borderRadius: 12, color: '#fff',
+                                    }}>↺ Try again</button>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Results grid */
+                            <div style={{ animation: 'bigPop .4s ease' }}>
+                                {/* Results header */}
+                                <div style={{
+                                    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+                                    marginBottom: 28, flexWrap: 'wrap', gap: 16,
+                                }}>
+                                    <div>
+                                        <div style={{
+                                            display: 'inline-flex', alignItems: 'center', gap: 7,
+                                            background: 'rgba(167,139,250,.09)', border: '1px solid rgba(167,139,250,.25)',
+                                            borderRadius: 999, padding: '4px 12px', marginBottom: 10,
+                                        }}>
+                                            <span style={{ fontSize: 10, fontWeight: 700, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '.14em' }}>
+                                                ✨ AI Ideas for {SITUATIONS.find(s => s.id === sit)?.icon} {SITUATIONS.find(s => s.id === sit)?.label}
+                                            </span>
+                                        </div>
+                                        <h2 style={{ fontSize: 28, fontWeight: 900, color: '#fff' }}>{ideas.length} AI-personalised ideas</h2>
+                                        <p style={{ fontSize: 14, color: 'rgba(255,255,255,.42)', marginTop: 4 }}>Generated by AI for your exact profile. Click any card to reveal the step-by-step roadmap.</p>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                        <button onClick={() => { setResults(false); setStep(0); setSit(null); setSkills([]); setIdeas([]); }} style={{
+                                            padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                                            background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)',
+                                            borderRadius: 12, color: 'rgba(255,255,255,.65)',
+                                        }}>← Start over</button>
+                                        <button onClick={generateIdeas} style={{
+                                            padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                                            background: 'rgba(167,139,250,.1)', border: '1px solid rgba(167,139,250,.28)',
+                                            borderRadius: 12, color: '#a78bfa',
+                                        }}>✨ Regenerate</button>
+                                        <Link to="/website-testing-report" style={{
+                                            padding: '10px 18px', fontSize: 13, fontWeight: 700, textDecoration: 'none',
+                                            background: 'rgba(6,182,212,.1)', border: '1px solid rgba(6,182,212,.28)',
+                                            borderRadius: 12, color: '#06b6d4',
+                                        }}>Test your website →</Link>
+                                    </div>
+                                </div>
+
+                                {/* Skill boost notice */}
+                                {skills.length > 0 && (
+                                    <div style={{
+                                        marginBottom: 24, padding: '12px 18px', borderRadius: 14,
+                                        background: 'rgba(167,139,250,.06)', border: '1px solid rgba(167,139,250,.18)',
+                                        display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center',
+                                    }}>
+                                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', fontWeight: 600 }}>Skills boosting your score:</span>
+                                        {skills.map(sk => {
+                                            const s = SKILLS.find(o => o.id === sk);
+                                            return s ? <span key={sk} style={{ fontSize: 12, color: '#c4b5fd', fontWeight: 700, background: 'rgba(167,139,250,.12)', borderRadius: 999, padding: '2px 10px' }}>{s.icon} {s.label}</span> : null;
+                                        })}
+                                    </div>
+                                )}
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 16 }}>
+                                    {ideas.map((idea, i) => <IdeaCard key={idea.name + i} idea={idea} index={i} skills={skills} />)}
+                                </div>
+
+                                {/* Cross-link CTA */}
+                                <div style={{
+                                    marginTop: 48, padding: '32px 36px',
+                                    background: 'linear-gradient(135deg,rgba(6,182,212,.06),rgba(167,139,250,.06))',
+                                    border: '1px solid rgba(6,182,212,.18)', borderRadius: 22,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20,
+                                }}>
+                                    <div>
+                                        <h3 style={{ fontSize: 20, fontWeight: 900, color: '#fff', marginBottom: 7 }}>Have a website already?</h3>
+                                        <p style={{ fontSize: 14, color: 'rgba(255,255,255,.45)' }}>Test it now — free instant scan, then a full audit for ₹599.</p>
+                                    </div>
+                                    <Link to="/website-testing-report" style={{
+                                        padding: '14px 26px', fontSize: 14, fontWeight: 800, textDecoration: 'none',
+                                        background: 'linear-gradient(135deg,#06b6d4,#0891b2)', color: '#fff',
+                                        borderRadius: 14, boxShadow: '0 0 24px rgba(6,182,212,.28)', flexShrink: 0,
+                                    }}>Test your website — free →</Link>
+                                </div>
                             </div>
                         )}
-
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 16 }}>
-                            {ideas.map((idea, i) => <IdeaCard key={idea.name} idea={idea} index={i} skills={skills} />)}
-                        </div>
-
-                        {/* Cross-link CTA */}
-                        <div style={{
-                            marginTop: 48, padding: '32px 36px',
-                            background: 'linear-gradient(135deg,rgba(6,182,212,.06),rgba(167,139,250,.06))',
-                            border: '1px solid rgba(6,182,212,.18)', borderRadius: 22,
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20,
-                        }}>
-                            <div>
-                                <h3 style={{ fontSize: 20, fontWeight: 900, color: '#fff', marginBottom: 7 }}>Have a website already?</h3>
-                                <p style={{ fontSize: 14, color: 'rgba(255,255,255,.45)' }}>Test it now — free instant scan, then a full audit for ₹599.</p>
-                            </div>
-                            <Link to="/website-testing-report" style={{
-                                padding: '14px 26px', fontSize: 14, fontWeight: 800, textDecoration: 'none',
-                                background: 'linear-gradient(135deg,#06b6d4,#0891b2)', color: '#fff',
-                                borderRadius: 14, boxShadow: '0 0 24px rgba(6,182,212,.28)', flexShrink: 0,
-                            }}>Test your website — free →</Link>
-                        </div>
                     </div>
                 )}
             </div>

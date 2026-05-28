@@ -341,6 +341,7 @@ export default function WebsiteTestingReport() {
     const [pEmail, setPEmail] = useState('');
     const [pUrl, setPUrl] = useState('');
     const [sent, setSent] = useState(false);
+    const resultPanelRef = React.useRef(null);
 
     const score = useMemo(() => showReport ? scoreFromUrl(submitted) : null, [submitted, showReport]);
 
@@ -351,6 +352,10 @@ export default function WebsiteTestingReport() {
         setShowReport(false);
         setScanning(true);
         setPUrl(url.trim());
+        // Scroll right panel into view on mobile
+        setTimeout(() => {
+            resultPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
         setTimeout(() => {
             setScanning(false);
             setShowReport(true);
@@ -379,7 +384,7 @@ export default function WebsiteTestingReport() {
             </nav>
 
             {/* ── HERO ─────────────────────────────────────────── */}
-            <section style={{ padding: '80px 32px 60px', maxWidth: 1200, margin: '0 auto' }}>
+            <section style={{ padding: '48px 32px 40px', maxWidth: 1200, margin: '0 auto' }}>
                 {/* social proof bar */}
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 36 }}>
                     <div style={{
@@ -476,26 +481,122 @@ export default function WebsiteTestingReport() {
                         </div>
                     </div>
 
-                    {/* Right: Flow Viz */}
-                    <div style={{
-                        background: 'rgba(10,16,28,.9)', border: '1px solid rgba(255,255,255,.08)',
-                        borderRadius: 24, padding: 20, boxShadow: '0 32px 64px rgba(0,0,0,.5)',
+                    {/* Right: Live Result Panel */}
+                    <div ref={resultPanelRef} style={{
+                        background: 'rgba(8,14,28,.97)', border: '1px solid rgba(6,182,212,.18)',
+                        borderRadius: 24, padding: 24, boxShadow: '0 32px 64px rgba(0,0,0,.5)',
+                        minHeight: 420, display: 'flex', flexDirection: 'column',
                     }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                            <div>
-                                <p style={{ fontSize: 10, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.16em' }}>Tech Profiler</p>
-                                <h2 style={{ fontSize: 17, fontWeight: 800, color: '#fff', marginTop: 2 }}>Website structure map</h2>
+
+                        {scanning ? (
+                            /* ── Scanning state ── */
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', animation: 'wtrFadeUp .3s ease' }}>
+                                <div style={{
+                                    width: 64, height: 64, borderRadius: '50%', marginBottom: 20,
+                                    border: '3px solid rgba(6,182,212,.15)',
+                                    borderTop: '3px solid #06b6d4',
+                                    animation: 'wtrSpin 1s linear infinite',
+                                }} />
+                                <p style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 6 }}>Scanning {submitted}…</p>
+                                <div style={{ height: 3, width: 220, borderRadius: 3, background: 'rgba(255,255,255,.07)', overflow: 'hidden', marginBottom: 16 }}>
+                                    <div style={{ height: '100%', borderRadius: 3, background: 'linear-gradient(90deg,#06b6d4,#a78bfa,#06b6d4)', backgroundSize: '200% 100%', animation: 'wtrShimmer 1.2s linear infinite' }} />
+                                </div>
+                                {['Checking Core Web Vitals…', 'Analysing SEO signals…', 'Evaluating UX patterns…'].map((t, i) => (
+                                    <p key={i} style={{ fontSize: 12, color: 'rgba(255,255,255,.35)', lineHeight: 2, animation: `wtrFadeUp .4s ease ${i * .35}s both` }}>✓ {t}</p>
+                                ))}
                             </div>
-                            <Link to="/business-idea-generator" style={{
-                                fontSize: 11, fontWeight: 700, color: '#10b981', textDecoration: 'none',
-                                background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.22)',
-                                borderRadius: 999, padding: '3px 10px',
-                            }}>Searchiva ↗</Link>
-                        </div>
-                        <FlowViz url={submitted || 'reviewdock.100xsolutions.in'} />
-                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,.22)', marginTop: 10, textAlign: 'center' }}>
-                            Live map updates when you enter your URL above
-                        </p>
+
+                        ) : showReport && score ? (
+                            /* ── User result ── */
+                            <div style={{ animation: 'wtrPop .4s ease' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                                    <div>
+                                        <p style={{ fontSize: 10, color: '#67e8f9', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.14em' }}>Your instant report</p>
+                                        <p style={{ fontSize: 13, color: 'rgba(255,255,255,.38)', marginTop: 3, wordBreak: 'break-all' }}>{submitted}</p>
+                                    </div>
+                                    <span style={{ fontSize: 10, fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 999, padding: '3px 9px', whiteSpace: 'nowrap' }}>✓ Done</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 20 }}>
+                                    <ScoreRing score={score} />
+                                    <div>
+                                        <p style={{ fontSize: 28, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{score}<span style={{ fontSize: 14, color: 'rgba(255,255,255,.35)', fontWeight: 400 }}>/100</span></p>
+                                        <p style={{ fontSize: 13, color: 'rgba(255,255,255,.45)', marginTop: 4, lineHeight: 1.6 }}>This instant scan gives a directional snapshot. Get a full expert audit for ₹599.</p>
+                                        <button onClick={() => setPopup(true)} style={{
+                                            marginTop: 12, padding: '10px 20px',
+                                            background: 'linear-gradient(135deg,#06b6d4,#a78bfa)',
+                                            border: 'none', borderRadius: 10, cursor: 'pointer',
+                                            fontSize: 13, fontWeight: 800, color: '#fff',
+                                            boxShadow: '0 0 20px rgba(6,182,212,.25)',
+                                        }}>Get complete report — ₹599</button>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {CATS.map(cat => {
+                                        const s = Math.min(100, Math.max(10, Math.round(score * cat.adj)));
+                                        return (
+                                            <div key={cat.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                <span style={{ fontSize: 13 }}>{cat.icon}</span>
+                                                <span style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', width: 110, flexShrink: 0 }}>{cat.label}</span>
+                                                <div style={{ flex: 1, height: 4, borderRadius: 4, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
+                                                    <div style={{ height: '100%', width: `${s}%`, borderRadius: 4, background: cat.color, boxShadow: `0 0 6px ${cat.color}88`, transition: 'width 1.3s cubic-bezier(.4,0,.2,1)' }} />
+                                                </div>
+                                                <span style={{ fontSize: 12, fontWeight: 700, color: cat.color, width: 24, textAlign: 'right' }}>{s}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                        ) : (
+                            /* ── Default demo ── */
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+                                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', animation: 'wtrPulse 2s ease-in-out infinite', display: 'inline-block' }} />
+                                            <span style={{ fontSize: 10, fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: '.14em' }}>Example output</span>
+                                        </div>
+                                        <p style={{ fontSize: 13, color: 'rgba(255,255,255,.38)' }}>mybakery.in</p>
+                                    </div>
+                                    <span style={{ fontSize: 10, fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 999, padding: '3px 9px' }}>✓ 2.4s</span>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 18 }}>
+                                    <ScoreRing score={74} />
+                                    <div>
+                                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginBottom: 6, lineHeight: 1.65 }}>Homepage clean, loads fast on desktop. Missing review schema and mobile CTA placement hurting conversions.</p>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                            {['+ Fast desktop load (1.1s)', '+ WhatsApp button visible', '→ Compress hero image (3.2MB)', '→ Add LocalBusiness schema'].map((w, i) => (
+                                                <p key={i} style={{ fontSize: 11, color: w.startsWith('+') ? '#10b981' : '#f59e0b', lineHeight: 1.5 }}>{w}</p>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 18 }}>
+                                    {[
+                                        { label: 'SEO', icon: '🔍', score: 66, color: '#06b6d4' },
+                                        { label: 'User Experience', icon: '✨', score: 78, color: '#a78bfa' },
+                                        { label: 'Performance', icon: '⚡', score: 63, color: '#f59e0b' },
+                                        { label: 'Features', icon: '🚀', score: 82, color: '#34d399' },
+                                        { label: 'Competitors', icon: '🎯', score: 71, color: '#f472b6' },
+                                    ].map(cat => (
+                                        <div key={cat.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            <span style={{ fontSize: 13 }}>{cat.icon}</span>
+                                            <span style={{ fontSize: 12, color: 'rgba(255,255,255,.45)', width: 110, flexShrink: 0 }}>{cat.label}</span>
+                                            <div style={{ flex: 1, height: 4, borderRadius: 4, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
+                                                <div style={{ height: '100%', width: `${cat.score}%`, borderRadius: 4, background: cat.color, boxShadow: `0 0 6px ${cat.color}88`, transition: 'width 1.3s cubic-bezier(.4,0,.2,1)' }} />
+                                            </div>
+                                            <span style={{ fontSize: 12, fontWeight: 700, color: cat.color, width: 24, textAlign: 'right' }}>{cat.score}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <p style={{ fontSize: 11, color: 'rgba(255,255,255,.25)', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,.06)', paddingTop: 14 }}>
+                                    ↑ Enter your URL to get your real report instantly
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </section>
@@ -527,48 +628,6 @@ export default function WebsiteTestingReport() {
                 </div>
             </section>
 
-            {/* ── INSTANT REPORT (post scan) ───────────────────── */}
-            {showReport && score && (
-                <section style={{ padding: '40px 32px', maxWidth: 1200, margin: '0 auto', animation: 'wtrFadeUp .5s ease' }}>
-                    <div style={{
-                        background: 'rgba(8,14,28,.96)', border: '1px solid rgba(6,182,212,.2)',
-                        borderRadius: 24, padding: '36px', boxShadow: '0 0 80px rgba(6,182,212,.05)',
-                    }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 40, alignItems: 'start', marginBottom: 32 }}>
-                            <div style={{ textAlign: 'center' }}>
-                                <ScoreRing score={score} />
-                                <p style={{ fontSize: 12, color: 'rgba(255,255,255,.35)', marginTop: 12, lineHeight: 1.5, wordBreak: 'break-all' }}>
-                                    Instant scan for<br /><span style={{ color: '#06b6d4', fontWeight: 700 }}>{submitted}</span>
-                                </p>
-                            </div>
-                            <div>
-                                <p style={{ fontSize: 11, color: '#67e8f9', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: 8 }}>Your instant report</p>
-                                <h2 style={{ fontSize: 30, fontWeight: 900, letterSpacing: '-.025em', marginBottom: 12 }}>Website score: {score}/100</h2>
-                                <p style={{ fontSize: 15, color: 'rgba(255,255,255,.52)', lineHeight: 1.75, marginBottom: 24, maxWidth: 520 }}>
-                                    This instant scan gives you a directional snapshot. The complete paid report includes manual expert review, annotated screenshots, competitor benchmarks, and a prioritised growth roadmap.
-                                </p>
-                                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                                    <button onClick={() => setPopup(true)} style={{
-                                        padding: '13px 26px',
-                                        background: 'linear-gradient(135deg,#06b6d4,#a78bfa)',
-                                        border: 'none', borderRadius: 13, cursor: 'pointer',
-                                        fontSize: 14, fontWeight: 800, color: '#fff',
-                                        boxShadow: '0 0 30px rgba(6,182,212,.3)',
-                                    }}>Get complete report — ₹599</button>
-                                    <div style={{
-                                        padding: '13px 18px', border: '1px solid rgba(255,255,255,.1)',
-                                        borderRadius: 13, fontSize: 13, color: 'rgba(255,255,255,.45)',
-                                        display: 'flex', alignItems: 'center', gap: 6,
-                                    }}>✓ 24–48h delivery</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(230px,1fr))', gap: 12 }}>
-                            {CATS.map(cat => <CatCard key={cat.key} cat={cat} base={score} />)}
-                        </div>
-                    </div>
-                </section>
-            )}
 
             {/* ── DEMO REPORTS ─────────────────────────────────── */}
             <section style={{ padding: '64px 32px', maxWidth: 1200, margin: '0 auto' }}>

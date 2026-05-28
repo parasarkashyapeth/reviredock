@@ -125,6 +125,116 @@ function detectPlatform(url) {
 }
 
 /**
+ * POST /api/business/generate-ideas
+ * Generate personalised business ideas via OpenRouter AI (public endpoint)
+ */
+router.post('/generate-ideas', async (req, res) => {
+    try {
+        const { situation, skills, timePerWeek, budget } = req.body;
+
+        if (!situation) {
+            return res.status(400).json({ error: 'Situation is required' });
+        }
+
+        const apiKey = process.env.OPENROUTER_API_KEY;
+        if (!apiKey) {
+            return res.status(503).json({ error: 'AI service not configured' });
+        }
+
+        const situationLabels = {
+            student: 'Student (college/university)',
+            employed: 'Employed (working 9-to-5)',
+            owner: 'Business Owner',
+            freelancer: 'Freelancer / Self-employed',
+            between: 'Career Change / Between jobs',
+        };
+
+        const prompt = `You are an expert business advisor specializing in realistic, actionable side hustles and business ideas for the Indian market.
+
+A user has the following profile:
+- Current situation: ${situationLabels[situation] || situation}
+- Skills: ${skills && skills.length > 0 ? skills.join(', ') : 'not specified'}
+- Available time per week: ${timePerWeek || '5-10'} hours
+- Starting budget: ${budget || 'low'}
+
+Generate exactly 4 highly personalised, realistic business ideas tailored to this profile. Each idea must be specific and immediately actionable for someone in India.
+
+Return ONLY a valid JSON array (no markdown, no explanation) in this exact format:
+[
+  {
+    "name": "Idea Name",
+    "icon": "single emoji",
+    "desc": "One sentence description max 120 chars",
+    "income": "₹X,000–₹Y,000/mo",
+    "first": "X days/weeks",
+    "fit": 85,
+    "tags": ["skill1", "skill2"],
+    "tools": ["Tool1", "Tool2", "Tool3"],
+    "steps": [
+      "Specific actionable step 1",
+      "Specific actionable step 2",
+      "Specific actionable step 3"
+    ]
+  }
+]
+
+Rules:
+- fit score must be 70-99 (integer), reflecting match with given skills
+- income must use ₹ sign and /mo format
+- first must be realistic timeframe like "3-5 days", "1-2 weeks"
+- tools must be real, free or low-cost tools
+- steps must be specific and immediately actionable
+- tags must be from: design, dev, marketing, sales, writing, teaching, finance, video, trade, data, community, photography
+- Return ONLY the JSON array, nothing else`;
+
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': process.env.FRONTEND_URL || 'http://localhost:8000',
+                'X-Title': 'ReviewDock Business Idea Generator',
+            },
+            body: JSON.stringify({
+                model: 'z-ai/glm-4.5-air:free',
+                messages: [{ role: 'user', content: prompt }],
+                max_tokens: 2000,
+                temperature: 0.8,
+            }),
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error('OpenRouter error:', response.status, errText);
+            return res.status(502).json({ error: 'AI service error, please try again' });
+        }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content?.trim();
+
+        if (!content) {
+            return res.status(502).json({ error: 'Empty response from AI' });
+        }
+
+        // Parse the JSON — strip markdown code fences if present
+        let ideas;
+        try {
+            const cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+            ideas = JSON.parse(cleaned);
+            if (!Array.isArray(ideas)) throw new Error('Not an array');
+        } catch (parseErr) {
+            console.error('Failed to parse AI response:', content, parseErr);
+            return res.status(502).json({ error: 'AI returned invalid format, please try again' });
+        }
+
+        res.json({ ideas });
+    } catch (error) {
+        console.error('Generate ideas error:', error);
+        res.status(500).json({ error: 'Failed to generate ideas' });
+    }
+});
+
+/**
  * POST /api/business/validate-review-url
  * Validate any review platform URL (replaces validate-google-url)
  */
