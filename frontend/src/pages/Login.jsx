@@ -2,6 +2,15 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
+// Helper: convert network/API errors to user-friendly messages
+const getFriendlyError = (err) => {
+    const msg = (err?.message || '').toLowerCase()
+    if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed')) {
+        return "We're having trouble connecting to the server. Please check your internet connection or try again later."
+    }
+    return err?.message || 'Something went wrong. Please try again.'
+}
+
 // Inject glass animations
 const GLASS_KEYFRAMES_ID = 'glass-auth-keyframes';
 if (typeof document !== 'undefined' && !document.getElementById(GLASS_KEYFRAMES_ID)) {
@@ -49,7 +58,7 @@ export default function Login() {
                 navigate('/dashboard')
             }
         } catch (err) {
-            setError(err.message)
+            setError(getFriendlyError(err))
         } finally {
             setGoogleLoading(false)
         }
@@ -64,7 +73,7 @@ export default function Login() {
             await login(email, password)
             navigate('/welcome')
         } catch (err) {
-            setError(err.message)
+            setError(getFriendlyError(err))
         } finally {
             setLoading(false)
         }

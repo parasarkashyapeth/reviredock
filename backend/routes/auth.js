@@ -186,11 +186,14 @@ router.post('/signup', authLimiter, async (req, res) => {
         // Check if email already exists
         const { data: existingUser } = await supabase
             .from('users')
-            .select('id')
+            .select('id, google_id')
             .eq('email', email.toLowerCase())
             .single();
 
         if (existingUser) {
+            if (existingUser.google_id) {
+                return res.status(400).json({ error: 'An account with this email already exists via Google. Please sign in with Google instead.' });
+            }
             return res.status(400).json({ error: 'Email already registered' });
         }
 
@@ -279,7 +282,8 @@ router.post('/signup', authLimiter, async (req, res) => {
                 businessName,
                 ownerName: ownerName || null,
                 profilePictureUrl: profilePictureUrl || null,
-                isAdmin: false
+                isAdmin: false,
+                isGoogleAccount: !!googleId
             }
         });
     } catch (error) {
@@ -332,7 +336,8 @@ router.post('/login', authLimiter, async (req, res) => {
                 businessName: user.businesses.name,
                 ownerName: user.owner_name || null,
                 profilePictureUrl: user.profile_picture_url || null,
-                isAdmin: user.is_admin || false
+                isAdmin: user.is_admin || false,
+                isGoogleAccount: !!user.google_id
             }
         });
     } catch (error) {
@@ -413,7 +418,8 @@ router.post('/google', authLimiter, async (req, res) => {
                     businessName: existingUser.businesses.name,
                     ownerName: existingUser.owner_name || name,
                     profilePictureUrl: picture || existingUser.profile_picture_url,
-                    isAdmin: existingUser.is_admin || false
+                    isAdmin: existingUser.is_admin || false,
+                    isGoogleAccount: !!existingUser.google_id
                 },
                 isNewUser: false
             });
@@ -461,7 +467,8 @@ router.get('/me', authenticate, async (req, res) => {
             businessName: user.businesses.name,
             ownerName: user.owner_name || null,
             profilePictureUrl: user.profile_picture_url || null,
-            isAdmin: user.is_admin || false
+            isAdmin: user.is_admin || false,
+            isGoogleAccount: !!user.google_id
         });
     } catch (error) {
         console.error('Get user error:', error);
@@ -665,12 +672,20 @@ router.post('/change-password', authenticate, async (req, res) => {
         // Get user
         const { data: user, error: userError } = await supabase
             .from('users')
-            .select('password_hash')
+            .select('password_hash, google_id')
             .eq('id', userId)
             .single();
 
         if (userError || !user) {
             return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Google-login users have no password_hash — guide them to Forgot Password
+        if (!user.password_hash) {
+            return res.status(400).json({
+                error: 'Your account uses Google Sign-In and does not have a password yet. Please use the "Forgot Password" flow to set a password first.',
+                isGoogleAccount: true
+            });
         }
 
         // Verify current password

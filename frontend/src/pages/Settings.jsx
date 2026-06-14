@@ -3,6 +3,16 @@ import { useAuth } from '../hooks/useAuth'
 import Layout from '../components/Layout'
 import API_URL from '../config/api'
 
+// Helper: convert network/API errors to user-friendly messages
+const getFriendlyError = (err, fallback = 'Something went wrong. Please try again.') => {
+    if (!err) return fallback
+    const msg = (err.message || '').toLowerCase()
+    if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed')) {
+        return "We're having trouble connecting to the server. Please check your internet connection or try again later."
+    }
+    return err.message || fallback
+}
+
 // Glass card style helper
 const glassCard = {
     background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
@@ -44,6 +54,7 @@ export default function Settings() {
     const [passwordSuccess, setPasswordSuccess] = useState('')
     const [passwordError, setPasswordError] = useState('')
     const [showPasswords, setShowPasswords] = useState({ current: false, new: false, confirm: false })
+    const [isGoogleAccount, setIsGoogleAccount] = useState(false)
 
     // External Summaries state
     const [externalSummaries, setExternalSummaries] = useState([])
@@ -270,6 +281,7 @@ export default function Settings() {
         e.preventDefault()
         setPasswordError('')
         setPasswordSuccess('')
+        setIsGoogleAccount(false)
 
         if (passwordData.newPassword.length < 6) {
             setPasswordError('New password must be at least 6 characters')
@@ -298,6 +310,9 @@ export default function Settings() {
             const data = await response.json()
 
             if (!response.ok) {
+                if (data.isGoogleAccount) {
+                    setIsGoogleAccount(true)
+                }
                 throw new Error(data.error || 'Failed to change password')
             }
 
@@ -305,7 +320,7 @@ export default function Settings() {
             setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
             setTimeout(() => setPasswordSuccess(''), 5000)
         } catch (err) {
-            setPasswordError(err.message)
+            setPasswordError(getFriendlyError(err))
         } finally {
             setChangingPassword(false)
         }
@@ -876,7 +891,32 @@ export default function Settings() {
                             >
                                 🔒 Change Password
                             </h3>
-                            <form onSubmit={handleChangePassword} className="space-y-4">
+                            {user?.isGoogleAccount ? (
+                                <div 
+                                    className="p-4 rounded-xl text-sm"
+                                    style={{
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                                    }}
+                                >
+                                    <p className="text-white/60 mb-3">
+                                        Your account is connected via Google. To set or change a password, please use the Forgot Password flow.
+                                    </p>
+                                    <a
+                                        href="/forgot-password"
+                                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105"
+                                        style={{
+                                            background: 'rgba(139,92,246,0.2)',
+                                            border: '1px solid rgba(139,92,246,0.4)',
+                                            color: '#c4b5fd',
+                                            textDecoration: 'none',
+                                        }}
+                                    >
+                                        🔑 Go to Forgot Password →
+                                    </a>
+                                </div>
+                            ) : (
+                                <form onSubmit={handleChangePassword} className="space-y-4">
                                 {/* Current Password */}
                                 <div>
                                     <label className="block text-sm font-medium text-white/80 mb-2">Current Password</label>
@@ -990,6 +1030,25 @@ export default function Settings() {
                                         }}
                                     >
                                         {passwordError}
+                                        {isGoogleAccount && (
+                                            <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(239,68,68,0.2)' }}>
+                                                <p className="text-xs text-white/60 mb-2">
+                                                    Since you signed up with Google, you need to set a password first using the link below:
+                                                </p>
+                                                <a
+                                                    href="/forgot-password"
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105"
+                                                    style={{
+                                                        background: 'rgba(139,92,246,0.2)',
+                                                        border: '1px solid rgba(139,92,246,0.4)',
+                                                        color: '#c4b5fd',
+                                                        textDecoration: 'none',
+                                                    }}
+                                                >
+                                                    🔑 Go to Forgot Password →
+                                                </a>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -1032,6 +1091,130 @@ export default function Settings() {
                                     )}
                                 </button>
                             </form>
+                            )}
+                        </div>
+
+                        {/* ── Third-Party Integrations ── */}
+                        <div
+                            className="mt-8 pt-6"
+                            style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}
+                        >
+                            <h3
+                                className="font-semibold mb-1"
+                                style={{
+                                    background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    backgroundClip: 'text',
+                                }}
+                            >
+                                🔌 Third-Party Integrations
+                            </h3>
+                            <p className="text-xs text-white/40 mb-5">
+                                Connect external platforms to automatically import reviews and sync your reputation data.
+                            </p>
+
+                            <div className="space-y-3">
+                                {/* Google Business Profile */}
+                                <div
+                                    className="flex items-center gap-4 p-4 rounded-xl"
+                                    style={{
+                                        background: 'rgba(255, 255, 255, 0.04)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    }}
+                                >
+                                    <div
+                                        className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                                        style={{ background: 'rgba(234, 67, 53, 0.15)', border: '1px solid rgba(234, 67, 53, 0.3)' }}
+                                    >
+                                        🗺️
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-white/90">Google Business Profile</p>
+                                        <p className="text-xs text-white/40 mt-0.5">
+                                            Auto-import Google reviews, reply directly, and sync your star rating.
+                                        </p>
+                                    </div>
+                                    <span
+                                        className="text-xs font-bold px-3 py-1 rounded-full flex-shrink-0"
+                                        style={{
+                                            background: 'rgba(245, 158, 11, 0.15)',
+                                            border: '1px solid rgba(245, 158, 11, 0.3)',
+                                            color: '#fbbf24',
+                                        }}
+                                    >
+                                        Coming Soon
+                                    </span>
+                                </div>
+
+                                {/* Trustpilot */}
+                                <div
+                                    className="flex items-center gap-4 p-4 rounded-xl"
+                                    style={{
+                                        background: 'rgba(255, 255, 255, 0.04)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    }}
+                                >
+                                    <div
+                                        className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                                        style={{ background: 'rgba(0, 182, 122, 0.15)', border: '1px solid rgba(0, 182, 122, 0.3)' }}
+                                    >
+                                        ⭐
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-white/90">Trustpilot</p>
+                                        <p className="text-xs text-white/40 mt-0.5">
+                                            Pull Trustpilot reviews into your ReviewDock dashboard automatically.
+                                        </p>
+                                    </div>
+                                    <span
+                                        className="text-xs font-bold px-3 py-1 rounded-full flex-shrink-0"
+                                        style={{
+                                            background: 'rgba(139, 92, 246, 0.12)',
+                                            border: '1px solid rgba(139, 92, 246, 0.25)',
+                                            color: '#a78bfa',
+                                        }}
+                                    >
+                                        On Roadmap
+                                    </span>
+                                </div>
+
+                                {/* G2 */}
+                                <div
+                                    className="flex items-center gap-4 p-4 rounded-xl"
+                                    style={{
+                                        background: 'rgba(255, 255, 255, 0.04)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    }}
+                                >
+                                    <div
+                                        className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                                        style={{ background: 'rgba(255, 102, 0, 0.15)', border: '1px solid rgba(255, 102, 0, 0.3)' }}
+                                    >
+                                        🏆
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-white/90">G2 Reviews</p>
+                                        <p className="text-xs text-white/40 mt-0.5">
+                                            Import G2 product reviews and track your software reputation.
+                                        </p>
+                                    </div>
+                                    <span
+                                        className="text-xs font-bold px-3 py-1 rounded-full flex-shrink-0"
+                                        style={{
+                                            background: 'rgba(139, 92, 246, 0.12)',
+                                            border: '1px solid rgba(139, 92, 246, 0.25)',
+                                            color: '#a78bfa',
+                                        }}
+                                    >
+                                        On Roadmap
+                                    </span>
+                                </div>
+
+                                <p className="text-xs text-white/25 text-center mt-3">
+                                    💡 Want a specific integration? <a href="mailto:support@reviewdock.in" className="text-purple-400/70 underline">Let us know</a>
+                                </p>
+                            </div>
                         </div>
                     </div>
                 )}

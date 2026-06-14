@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import Layout from '../components/Layout'
 import API_URL from '../config/api'
@@ -14,14 +15,44 @@ const glassCard = {
     borderRadius: '1.5rem',
 }
 
+// Helper: convert network/API errors to user-friendly messages
+const getFriendlyError = (err, fallback = 'Something went wrong. Please try again.') => {
+    if (!err) return fallback
+    const msg = err.message || ''
+    if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror') || msg.toLowerCase().includes('load failed')) {
+        return "We're having trouble connecting to the server. Please check your internet connection or try again later."
+    }
+    if (msg.includes('401') || msg.includes('403')) {
+        return 'Your session expired. Please log in again.'
+    }
+    if (msg.includes('500')) {
+        return 'A server error occurred. Please try again in a moment.'
+    }
+    return msg || fallback
+}
+
 export default function Dashboard() {
     const { user, getToken } = useAuth()
+    const navigate = useNavigate()
     const [stats, setStats] = useState({ total: 0, positive: 0, negative: 0, avgRating: 0, positiveRate: 0 })
     const [feedbacks, setFeedbacks] = useState([])
     const [filter, setFilter] = useState('all')
     const [feedbackType, setFeedbackType] = useState('all') // 'all', 'positive', 'negative'
     const [loading, setLoading] = useState(true)
+    const [filterRefreshing, setFilterRefreshing] = useState(false) // subtle refresh indicator on filter change
     const [lastUpdated, setLastUpdated] = useState(new Date())
+
+    // Onboarding banner (dismissed in localStorage)
+    const [onboardingDismissed, setOnboardingDismissed] = useState(
+        () => localStorage.getItem('rdock_onboarding_dismissed') === 'true'
+    )
+    const dismissOnboarding = () => {
+        localStorage.setItem('rdock_onboarding_dismissed', 'true')
+        setOnboardingDismissed(true)
+    }
+
+    // Advanced metrics accordion (open on desktop, closed on mobile)
+    const [showAdvancedMetrics, setShowAdvancedMetrics] = useState(() => window.innerWidth >= 768)
 
     // Search
     const [searchQuery, setSearchQuery] = useState('')
@@ -43,6 +74,7 @@ export default function Dashboard() {
     // AI Summary state
     const [aiSummary, setAiSummary] = useState(null)
     const [aiLoading, setAiLoading] = useState(false)
+    const isFirstMount = useRef(true)
 
     // Saved external summaries from Settings
     const [savedSummaries, setSavedSummaries] = useState([])
@@ -50,6 +82,13 @@ export default function Dashboard() {
     const [summaryAnalysis, setSummaryAnalysis] = useState(null)
     const [summaryAnalyzing, setSummaryAnalyzing] = useState(false)
     const [summaryError, setSummaryError] = useState('')
+
+    // Redirect to profile setup if business details are missing/default
+    useEffect(() => {
+        if (user && (!user.businessName || user.businessName === 'My Business')) {
+            navigate('/profile-setup', { replace: true })
+        }
+    }, [user, navigate])
 
     // Fetch saved external summaries from settings
     useEffect(() => {
@@ -98,7 +137,13 @@ export default function Dashboard() {
 
     // Initial fetch and auto-refresh every 30 seconds (pauses when tab not visible)
     useEffect(() => {
-        fetchData()
+        if (isFirstMount.current) {
+            fetchData(true)
+            isFirstMount.current = false
+        } else {
+            setFilterRefreshing(true)
+            fetchData(false)
+        }
 
         let interval = null
         const startPolling = () => {
@@ -115,7 +160,14 @@ export default function Dashboard() {
             else { fetchData(false); startPolling() }
         }
 
-    }, [filter, feedbackType]); // Added missing semicolon
+        startPolling()
+        document.addEventListener('visibilitychange', handleVisibility)
+        return () => {
+            stopPolling()
+            document.removeEventListener('visibilitychange', handleVisibility)
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filter, feedbackType]);
 
     const fetchData = async (showLoading = true) => {
         if (showLoading) setLoading(true);
@@ -123,6 +175,7 @@ export default function Dashboard() {
             const token = getToken();
             if (!token || !user?.businessId) {
                 setLoading(false);
+                setFilterRefreshing(false);
                 return;
             }
 
@@ -147,12 +200,15 @@ export default function Dashboard() {
                 const feedbackData = await feedbackRes.json();
                 setFeedbacks(feedbackData.feedbacks || []);
             }
+            setLastUpdated(new Date());
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
             setLoading(false);
+            setFilterRefreshing(false);
         }
     };
+
 
     const filterOptions = useMemo(() => [
         { value: 'all', label: 'All Time' },
@@ -424,105 +480,102 @@ export default function Dashboard() {
     return (
         <Layout>
             <div className="animate-fadeIn">
-                {/* Profile Card Header */}
-                <div 
-                    className="p-6 overflow-hidden relative mb-6"
+                {/* ── Unified Hero Bar (replaces separate profile card + dashboard title) ── */}
+                <div
+                    className="relative overflow-hidden mb-8"
                     style={{
-                        ...glassCard,
-                        background: 'rgba(10,  0, 40, 0.6)',
-                        backdropFilter: 'blur(20px) saturate(1.8)',
-                        WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
-                        border: '1px solid rgba(100, 200, 255, 0.15)',
-                        boxShadow: '0 4px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(100, 200, 255, 0.05)',
+                        background: 'linear-gradient(135deg, rgba(10,0,40,0.75) 0%, rgba(20,10,60,0.65) 100%)',
+                        backdropFilter: 'blur(24px) saturate(1.8)',
+                        WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                        border: '1px solid rgba(100,200,255,0.13)',
+                        borderRadius: '1.5rem',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.04) inset',
                     }}
                 >
-                    <div className="absolute inset-0 opacity-20" style={{
-                        background: 'linear-gradient(90deg, transparent 0%, rgba(100, 200, 255, 0.1) 50%, transparent 100%)',
+                    {/* Subtle shimmer sweep */}
+                    <div className="absolute inset-0 pointer-events-none" style={{
+                        background: 'linear-gradient(90deg, transparent 0%, rgba(100,200,255,0.06) 50%, transparent 100%)',
                         backgroundSize: '200% 100%',
-                        animation: 'glassShine 8s ease-in-out infinite',
-                    }}></div>
-                    <div className="relative flex items-center gap-4">
-                        <div 
-                            className="w-16 h-16 rounded-full shadow-lg overflow-hidden flex-shrink-0"
-                            style={{
-                                border: '3px solid rgba(100, 200, 255, 0.3)',
-                                boxShadow: '0 0 20px rgba(100, 200, 255, 0.4)',
-                            }}
-                        >
-                            <img
-                                src={user?.profilePictureUrl || getDefaultAvatar(user?.ownerName || user?.businessName)}
-                                alt="Profile"
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                    e.target.src = getDefaultAvatar(user?.ownerName || user?.businessName)
-                                }}
-                            />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h2 
-                                className="text-xl font-bold truncate"
+                        animation: 'glassShine 9s ease-in-out infinite',
+                    }} />
+                    {/* Gradient accent left edge */}
+                    <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-3xl" style={{
+                        background: 'linear-gradient(180deg, rgba(99,102,241,0.7), rgba(168,85,247,0.5), rgba(236,72,153,0.4))',
+                    }} />
+
+                    <div className="relative px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        {/* Left: Avatar + greeting */}
+                        <div className="flex items-center gap-4">
+                            <div
+                                className="w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0"
                                 style={{
-                                    background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    backgroundClip: 'text',
+                                    border: '2px solid rgba(100,200,255,0.25)',
+                                    boxShadow: '0 0 18px rgba(100,200,255,0.3)',
                                 }}
                             >
-                                Welcome back, {user?.ownerName || user?.businessName || 'Owner'}!
-                            </h2>
-                            <p className="text-white/70 text-sm truncate">{user?.businessName}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                                <span className="text-xs text-white/60">Online</span>
+                                <img
+                                    src={user?.profilePictureUrl || getDefaultAvatar(user?.ownerName || user?.businessName)}
+                                    alt="Profile"
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => { e.target.src = getDefaultAvatar(user?.ownerName || user?.businessName) }}
+                                />
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-widest mb-0.5" style={{ color: 'rgba(165,180,252,0.6)', letterSpacing: '0.12em' }}>Dashboard</p>
+                                <h1
+                                    className="text-xl font-bold leading-tight"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        backgroundClip: 'text',
+                                    }}
+                                >
+                                    Welcome back, {user?.ownerName?.split(' ')[0] || user?.businessName || 'Owner'}!
+                                </h1>
+                                <div className="flex items-center gap-3 mt-1">
+                                    <span className="text-white/50 text-xs">{user?.businessName}</span>
+                                    <span className="w-1 h-1 bg-white/25 rounded-full" />
+                                    <span className="flex items-center gap-1 text-xs" style={{ color: '#4ade80' }}>
+                                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                                        Live · {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                {/* Header with Filters */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold flex items-center gap-2">
-                            <span className="text-white/80"><IconDashboard className="w-7 h-7" /></span>
-                            <span
-                                style={{
-                                    background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    backgroundClip: 'text',
-                                }}
-                            >
-                                Dashboard
-                            </span>
-                        </h1>
-                        <p className="text-white/60">View feedback for your business</p>
-                        <p className="text-xs text-green-400 flex items-center gap-1 mt-1">
-                            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                            Real-time updates • Last: {lastUpdated.toLocaleTimeString()}
-                        </p>
-                    </div>
-
-                    {/* Filter Buttons */}
-                    <div className="flex gap-2 flex-wrap">
-                        {filterOptions.map((opt) => (
-                            <button
-                                key={opt.value}
-                                onClick={() => setFilter(opt.value)}
-                                className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300"
-                                style={filter === opt.value ? {
-                                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%)',
-                                    border: '2px solid rgba(102, 126, 234, 0.6)',
-                                    color: '#a5b4fc',
-                                    boxShadow: '0 0 20px rgba(102, 126, 234, 0.3)',
-                                } : {
-                                    background: 'rgba(255, 255, 255, 0.08)',
-                                    border: '2px solid rgba(255, 255, 255, 0.15)',
-                                    color: 'rgba(255, 255, 255, 0.7)',
-                                }}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
+                        {/* Right: compact filter pills */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            {filterOptions.map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    onClick={() => {
+                                        if (opt.value !== filter) {
+                                            setFilter(opt.value)
+                                            setFilterRefreshing(true)
+                                        }
+                                    }}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-250 hover:scale-105 active:scale-95"
+                                    style={filter === opt.value ? {
+                                        background: 'linear-gradient(135deg, rgba(99,102,241,0.4) 0%, rgba(139,92,246,0.35) 100%)',
+                                        border: '1px solid rgba(99,102,241,0.55)',
+                                        color: '#a5b4fc',
+                                        boxShadow: '0 0 12px rgba(99,102,241,0.25)',
+                                    } : {
+                                        background: 'rgba(255,255,255,0.06)',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        color: 'rgba(255,255,255,0.55)',
+                                    }}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                            {filterRefreshing && (
+                                <span className="flex items-center gap-1 text-xs text-white/35 ml-1">
+                                    <span className="animate-spin inline-block w-3 h-3 border border-white/25 border-t-white/70 rounded-full" />
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -535,8 +588,117 @@ export default function Dashboard() {
                     </div>
                 ) : (
                     <>
-                        {/* Feedback Summary */}
-                        <div className="p-6 mb-8" style={glassCard}>
+                        {/* ── Onboarding Banner ── shown when user has 0 feedbacks and hasn't dismissed */}
+                        {feedbacks.length === 0 && !onboardingDismissed && (
+                            <div
+                                className="relative overflow-hidden mb-10"
+                                style={{
+                                    borderRadius: '1.5rem',
+                                    padding: '2px', // border-gradient wrapper
+                                    background: 'linear-gradient(135deg, rgba(99,102,241,0.7) 0%, rgba(168,85,247,0.6) 50%, rgba(236,72,153,0.5) 100%)',
+                                    boxShadow: '0 0 48px rgba(99,102,241,0.25), 0 12px 40px rgba(0,0,0,0.4)',
+                                    animation: 'wb-ctaPulse 3s ease-in-out infinite',
+                                }}
+                            >
+                                <div
+                                    className="relative overflow-hidden"
+                                    style={{
+                                        borderRadius: 'calc(1.5rem - 2px)',
+                                        background: 'linear-gradient(135deg, rgba(15,8,50,0.97) 0%, rgba(25,12,65,0.97) 100%)',
+                                        backdropFilter: 'blur(20px)',
+                                        padding: '1.75rem',
+                                    }}
+                                >
+                                    {/* Dismiss */}
+                                    <button
+                                        onClick={dismissOnboarding}
+                                        className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full text-white/30 hover:text-white/70 hover:bg-white/10 transition-all text-sm leading-none"
+                                        title="Dismiss"
+                                    >✕</button>
+
+                                    {/* Header row */}
+                                    <div className="flex items-center gap-4 mb-6">
+                                        <div
+                                            className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
+                                            style={{
+                                                background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(168,85,247,0.25))',
+                                                border: '1px solid rgba(139,92,246,0.4)',
+                                                boxShadow: '0 0 20px rgba(139,92,246,0.2)',
+                                            }}
+                                        >🚀</div>
+                                        <div>
+                                            <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'rgba(165,180,252,0.65)', letterSpacing: '0.14em' }}>Get Started</p>
+                                            <h2 className="text-xl font-bold text-white leading-tight">Connect your business & collect your first review</h2>
+                                        </div>
+                                    </div>
+
+                                    {/* Steps Checklist */}
+                                    <div className="flex flex-col gap-3 mb-2">
+                                        {[
+                                            { 
+                                                step: 1, 
+                                                title: 'Complete Business Details', 
+                                                desc: 'Your profile is set up and ready to go.', 
+                                                done: true, 
+                                                action: null 
+                                            },
+                                            { 
+                                                step: 2, 
+                                                title: 'Get Your Review Link', 
+                                                desc: 'Generate your unique QR code or link to share with customers.', 
+                                                done: false, 
+                                                action: { text: 'Go to QR Code', link: '/qr-code' } 
+                                            },
+                                            { 
+                                                step: 3, 
+                                                title: 'Collect First Feedback', 
+                                                desc: 'Share your link and get your first customer review to see it appear here.', 
+                                                done: false, 
+                                                action: null 
+                                            },
+                                        ].map(s => (
+                                            <div
+                                                key={s.step}
+                                                className="flex items-center gap-4 p-4 rounded-xl transition-all"
+                                                style={{
+                                                    background: s.done ? 'rgba(34,197,94,0.05)' : 'rgba(255,255,255,0.03)',
+                                                    border: `1px solid ${s.done ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.1)'}`,
+                                                }}
+                                            >
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold ${s.done ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-white/30 border border-white/10'}`}>
+                                                    {s.done ? '✓' : s.step}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className={`text-sm font-semibold mb-0.5 ${s.done ? 'text-green-400' : 'text-white'}`}>{s.title}</p>
+                                                    <p className="text-xs text-white/40">{s.desc}</p>
+                                                </div>
+                                                {s.action && (
+                                                    <a
+                                                        href={s.action.link}
+                                                        className="px-4 py-2 rounded-lg text-xs font-bold text-white transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+                                                        style={{
+                                                            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                                                            boxShadow: '0 0 15px rgba(99,102,241,0.3)',
+                                                        }}
+                                                    >
+                                                        {s.action.text} →
+                                                    </a>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Section Label: Performance Overview ── */}
+                        <div className="flex items-center gap-3 mb-4">
+                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'rgba(165,180,252,0.55)', letterSpacing: '0.16em' }}>Performance Overview</p>
+                            <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(165,180,252,0.2), transparent)' }} />
+                        </div>
+
+                        {/* ── Feedback Summary ── */}
+                        <div className="p-6 mb-6" style={glassCard}>
                             <div className="flex items-center justify-between mb-6">
                                 <h2 
                                     className="text-lg font-bold tracking-wide"
@@ -590,6 +752,12 @@ export default function Dashboard() {
                             </div>
                         </div>
 
+                        {/* ── Section Label: Engagement Metrics ── */}
+                        <div className="flex items-center gap-3 mb-4 mt-10">
+                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'rgba(165,180,252,0.55)', letterSpacing: '0.16em' }}>Engagement Metrics</p>
+                            <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(165,180,252,0.2), transparent)' }} />
+                        </div>
+
                         {/* NPS, Response Rate, Avg Response Time */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                             {/* NPS Score */}
@@ -641,6 +809,12 @@ export default function Dashboard() {
                                     {stats.avgResponseTime != null ? ( stats.avgResponseTime < 24 ? 'Great response time!' : 'Try to respond faster') : 'No replies yet'}
                                 </p>
                             </div>
+                        </div>
+
+                        {/* ── Section Label: Insights ── */}
+                        <div className="flex items-center gap-3 mb-4 mt-10">
+                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'rgba(165,180,252,0.55)', letterSpacing: '0.16em' }}>Insights</p>
+                            <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(165,180,252,0.2), transparent)' }} />
                         </div>
 
                         {/* Rating Distribution + Top Keywords */}

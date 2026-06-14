@@ -3,6 +3,15 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import API_URL from '../config/api'
 
+// Helper: convert network/API errors to user-friendly messages
+const getFriendlyError = (err) => {
+    const msg = (err?.message || '').toLowerCase()
+    if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed')) {
+        return "We're having trouble connecting to the server. Please check your internet connection or try again later."
+    }
+    return err?.message || 'Something went wrong. Please try again.'
+}
+
 // Inject glass animations
 const GLASS_KEYFRAMES_ID = 'glass-auth-keyframes';
 if (typeof document !== 'undefined' && !document.getElementById(GLASS_KEYFRAMES_ID)) {
@@ -91,7 +100,7 @@ export default function Signup() {
                 navigate('/dashboard')
             }
         } catch (err) {
-            setError(err.message)
+            setError(getFriendlyError(err))
         } finally {
             setGoogleLoading(false)
         }
@@ -155,7 +164,7 @@ export default function Signup() {
                 })
             }, 1000)
         } catch (err) {
-            setError(err.message)
+            setError(getFriendlyError(err))
         } finally {
             setSendingOtp(false)
         }
@@ -187,7 +196,7 @@ export default function Signup() {
             setOtpVerified(true)
             setShowOtpStep(false)
         } catch (err) {
-            setError(err.message)
+            setError(getFriendlyError(err))
         } finally {
             setVerifyingOtp(false)
         }
@@ -238,7 +247,7 @@ export default function Signup() {
             // Navigate to profile setup (step 2) instead of welcome
             navigate('/profile-setup')
         } catch (err) {
-            setError(err.message)
+            setError(getFriendlyError(err))
         } finally {
             setLoading(false)
         }

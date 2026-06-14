@@ -456,7 +456,7 @@ export default function Layout({ children }) {
                             <div className="relative" ref={profileDropdownRef} style={{ zIndex: 100 }}>
                                 <button
                                     onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                                    className="flex items-center gap-3 px-3 py-1.5 rounded-xl transition-all duration-300 group"
+                                    className="flex items-center gap-3 px-3 py-1.5 rounded-xl transition-all duration-300 group relative"
                                     style={{
                                         background: showProfileDropdown ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
                                         border: showProfileDropdown ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
@@ -477,19 +477,36 @@ export default function Layout({ children }) {
                                         }
                                     }}
                                 >
-                                    <img
-                                        src={user?.profilePictureUrl || getDefaultAvatar(user?.ownerName || user?.businessName)}
-                                        alt="Profile"
-                                        className="w-8 h-8 rounded-full object-cover"
-                                        style={{
-                                            border: '2px solid rgba(139, 92, 246, 0.5)',
-                                            boxShadow: '0 0 10px rgba(139, 92, 246, 0.3)',
-                                            animation: 'profileRing 4s ease-in-out infinite',
-                                        }}
-                                        onError={(e) => {
-                                            e.target.src = getDefaultAvatar(user?.ownerName || user?.businessName)
-                                        }}
-                                    />
+                                    <div className="relative">
+                                        <img
+                                            src={user?.profilePictureUrl || getDefaultAvatar(user?.ownerName || user?.businessName)}
+                                            alt="Profile"
+                                            className="w-8 h-8 rounded-full object-cover"
+                                            style={{
+                                                border: '2px solid rgba(139, 92, 246, 0.5)',
+                                                boxShadow: '0 0 10px rgba(139, 92, 246, 0.3)',
+                                                animation: 'profileRing 4s ease-in-out infinite',
+                                            }}
+                                            onError={(e) => {
+                                                e.target.src = getDefaultAvatar(user?.ownerName || user?.businessName)
+                                            }}
+                                        />
+                                        {/* Setup nudge: orange dot if profile incomplete */}
+                                        {!user?.businessName && (
+                                            <span
+                                                title="Complete your business profile"
+                                                style={{
+                                                    position: 'absolute', top: -2, right: -2,
+                                                    width: 9, height: 9,
+                                                    borderRadius: '50%',
+                                                    background: '#f97316',
+                                                    border: '1.5px solid #000',
+                                                    boxShadow: '0 0 6px rgba(249,115,22,0.7)',
+                                                    animation: 'pulse 2s ease-in-out infinite',
+                                                }}
+                                            />
+                                        )}
+                                    </div>
                                     <span className="text-sm text-white/90 font-semibold group-hover:text-white transition-colors duration-300">
                                         {user?.ownerName || user?.businessName}
                                     </span>
@@ -506,46 +523,66 @@ export default function Layout({ children }) {
                                 {/* Profile Dropdown */}
                                 {showProfileDropdown && (
                                     <div
-                                        className="absolute right-0 mt-2 w-56 rounded-xl"
+                                        className="absolute right-0 mt-2 w-60 rounded-xl"
                                         style={{
                                             zIndex: 9999,
-                                            background: 'linear-gradient(135deg, rgba(30, 30, 50, 0.98) 0%, rgba(20, 20, 40, 0.98) 100%)',
-                                            backdropFilter: 'blur(20px)',
-                                            WebkitBackdropFilter: 'blur(20px)',
-                                            border: '1px solid rgba(255, 255, 255, 0.15)',
-                                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                                            background: 'linear-gradient(135deg, rgba(15,15,35,0.99) 0%, rgba(10,10,28,0.99) 100%)',
+                                            backdropFilter: 'blur(24px)',
+                                            WebkitBackdropFilter: 'blur(24px)',
+                                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                                            boxShadow: '0 32px 64px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255,255,255,0.04) inset',
                                             animation: 'dropdownFadeIn 0.2s ease-out',
                                         }}
                                     >
                                         {/* Profile Info */}
                                         <div
-                                            className="px-4 py-3"
-                                            style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}
+                                            className="px-4 py-3.5"
+                                            style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}
                                         >
-                                            <p className="text-white font-medium truncate">{user?.ownerName || user?.businessName}</p>
-                                            <p className="text-white/50 text-sm truncate">{user?.email}</p>
+                                            <p className="text-white font-semibold truncate text-sm">{user?.ownerName || user?.businessName}</p>
+                                            <p className="text-white/40 text-xs truncate mt-0.5">{user?.email}</p>
                                         </div>
 
                                         {/* Dropdown Items */}
-                                        <div className="py-2">
+                                        <div className="py-1.5">
+                                            {/* Settings link */}
+                                            <NavLink
+                                                to="/settings"
+                                                onClick={() => setShowProfileDropdown(false)}
+                                                className="w-full px-4 py-2.5 text-left flex items-center gap-3 transition-all duration-200 group"
+                                                style={{ color: 'rgba(255,255,255,0.72)', textDecoration: 'none', display: 'flex' }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(139,92,246,0.1)'
+                                                    e.currentTarget.style.color = '#fff'
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = 'transparent'
+                                                    e.currentTarget.style.color = 'rgba(255,255,255,0.72)'
+                                                }}
+                                            >
+                                                <span style={{ fontSize: 15 }}>⚙️</span>
+                                                <span className="text-sm font-medium">Settings</span>
+                                            </NavLink>
+
+                                            {/* Divider */}
+                                            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 12px' }} />
+
                                             <button
                                                 onClick={() => {
                                                     setShowProfileDropdown(false)
                                                     handleLogout()
                                                 }}
-                                                className="w-full px-4 py-2.5 text-left flex items-center gap-3 transition-all duration-300 group"
+                                                className="w-full px-4 py-2.5 text-left flex items-center gap-3 transition-all duration-200"
                                                 style={{ color: '#f87171' }}
                                                 onMouseEnter={(e) => {
                                                     e.currentTarget.style.background = 'rgba(248, 113, 113, 0.1)'
-                                                    e.currentTarget.style.paddingLeft = '20px'
                                                 }}
                                                 onMouseLeave={(e) => {
                                                     e.currentTarget.style.background = 'transparent'
-                                                    e.currentTarget.style.paddingLeft = '16px'
                                                 }}
                                             >
-                                                <span className="transition-transform duration-300 group-hover:scale-110">🚪</span>
-                                                <span>Logout</span>
+                                                <span style={{ fontSize: 15 }}>🚪</span>
+                                                <span className="text-sm font-medium">Logout</span>
                                             </button>
                                         </div>
                                     </div>
@@ -662,7 +699,7 @@ export default function Layout({ children }) {
             </nav>
 
             {/* Main Content */}
-            <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24 pb-20">
+            <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-28 pb-24">
                 <div style={{ animation: 'fadeInUp 0.6s ease-out' }}>
                     {children}
                 </div>

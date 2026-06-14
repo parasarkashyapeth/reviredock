@@ -913,6 +913,28 @@ export default function LandingPage() {
                             <p className="text-gray-400 text-sm sm:text-base md:text-lg max-w-2xl mx-auto">
                                 Choose the plan that fits your needs. Start free and upgrade as you grow.
                             </p>
+                            {/* Launch Offer Banner */}
+                            <div
+                                className="inline-flex items-center gap-3 mt-6 px-5 py-3 rounded-2xl"
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(251,146,60,0.15) 0%, rgba(239,68,68,0.1) 100%)',
+                                    border: '1px solid rgba(251,146,60,0.35)',
+                                    boxShadow: '0 0 30px rgba(251,146,60,0.15)',
+                                    animation: 'pulse 2.5s ease-in-out infinite',
+                                }}
+                            >
+                                <span className="text-lg">🔥</span>
+                                <div className="text-left">
+                                    <p className="text-sm font-bold text-orange-300">Launch Offer — Up to 25% OFF</p>
+                                    <p className="text-xs text-orange-300/80">Prices increasing soon · Lock in your rate today!</p>
+                                </div>
+                                <span
+                                    className="text-xs font-bold px-2.5 py-1 rounded-full"
+                                    style={{ background: 'rgba(251,146,60,0.25)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.4)' }}
+                                >
+                                    ENDING SOON
+                                </span>
+                            </div>
                         </div>
                     </Reveal>
 
@@ -964,9 +986,16 @@ export default function LandingPage() {
                                         <h3 className="text-lg sm:text-xl font-bold text-white mb-1 sm:mb-2">Pro</h3>
                                         <p className="text-gray-400 text-xs sm:text-sm">For growing businesses</p>
                                     </div>
-                                    <div className="mb-4 sm:mb-6 flex items-baseline">
+                                    <div className="mb-4 sm:mb-6 flex items-baseline gap-3 flex-wrap">
                                         <span className="text-3xl sm:text-4xl md:text-5xl font-bold text-white">₹299</span>
                                         <span className="text-gray-500 ml-1 text-sm">/mo</span>
+                                        <span className="flex items-center gap-1.5">
+                                            <s className="text-gray-600 text-sm">₹399</s>
+                                            <span
+                                                className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                                style={{ background: 'rgba(251,146,60,0.2)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.35)' }}
+                                            >25% OFF</span>
+                                        </span>
                                     </div>
                                     <div className="space-y-3 sm:space-y-4">
                                         {[
@@ -1280,14 +1309,92 @@ export default function LandingPage() {
             </Reveal>
 
             {/* Footer */}
-            <footer className="px-4 py-8 sm:py-10 md:py-12 text-center bg-black">
-                <div className="max-w-4xl mx-auto flex flex-col items-center justify-center gap-4 sm:gap-6">
-                    <p className="text-[10px] sm:text-xs md:text-sm text-[#4b5563] font-medium">
-                         © 2026 Review Dock • Built by 100xSolutions • The standard for trust
-                    </p>
-                    <div className="flex gap-4 sm:gap-6 md:gap-8 text-[10px] sm:text-xs md:text-sm text-[#4b5563] font-medium">
-                        <Link to="/privacy-policy" className="hover:text-gray-300 transition-colors">Privacy Policy</Link>
-                        <Link to="/terms-of-service" className="hover:text-gray-300 transition-colors">Terms & Conditions</Link>
+            <footer className="px-4 pt-14 pb-10 bg-black border-t border-white/5">
+                <div className="max-w-6xl mx-auto">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
+
+                        {/* Column 1: Brand */}
+                        <div className="col-span-2 md:col-span-1">
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="text-2xl">⚓</span>
+                                <span className="text-lg font-bold text-white">ReviewDock</span>
+                            </div>
+                            <p className="text-gray-500 text-sm leading-relaxed mb-4">
+                                Smart review management for modern businesses. Collect feedback, redirect happy customers to Google, and grow your reputation.
+                            </p>
+                            <p className="text-gray-600 text-xs">Built by 100xSolutions · Made in India 🇮🇳</p>
+                        </div>
+
+                        {/* Column 2: Product */}
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4">Product</p>
+                            <ul className="space-y-2.5">
+                                {[
+                                    { label: 'Dashboard', to: '/dashboard' },
+                                    { label: 'Pricing', to: '/pricing' },
+                                    { label: 'QR Code', to: '/qr-code' },
+                                    { label: 'Analytics', to: '/analytics' },
+                                    { label: 'Privacy Policy', to: '/privacy-policy' },
+                                    { label: 'Terms of Service', to: '/terms-of-service' },
+                                ].map(({ label, to }) => (
+                                    <li key={label}>
+                                        <Link to={to} className="text-gray-400 hover:text-white text-sm transition-colors">{label}</Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        {/* Column 3: Ecosystem & Tools */}
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4">Ecosystem & Tools</p>
+                            <ul className="space-y-2.5">
+                                {[
+                                    { label: '🚀 Searchiva', href: 'https://searchiva.100xsolutions.com' },
+                                    { label: '🔍 Website Audit', to: '/website-testing-report' },
+                                    { label: '💡 Business Ideas', to: '/business-idea-generator' },
+                                    { label: '📉 Case Studies', to: '/blog/business-failure-case-studies' },
+                                ].map((link) => (
+                                    <li key={link.label}>
+                                        {link.href ? (
+                                            <a href={link.href} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">
+                                                {link.label}
+                                            </a>
+                                        ) : (
+                                            <Link to={link.to} className="text-gray-400 hover:text-white text-sm transition-colors">
+                                                {link.label}
+                                            </Link>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        {/* Column 4: Useful External Links */}
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4">Useful Links</p>
+                            <ul className="space-y-2.5">
+                                {[
+                                    { label: '🗺️ Google Business Profile', href: 'https://business.google.com' },
+                                    { label: '⭐ Trustpilot', href: 'https://www.trustpilot.com' },
+                                    { label: '🏆 G2 Reviews', href: 'https://www.g2.com' },
+                                    { label: '📋 Capterra', href: 'https://www.capterra.com' },
+                                    { label: '🔶 JustDial', href: 'https://www.justdial.com' },
+                                ].map(({ label, href }) => (
+                                    <li key={label}>
+                                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">{label}</a>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* Bottom bar */}
+                    <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <p className="text-gray-600 text-xs">© {new Date().getFullYear()} ReviewDock · All rights reserved</p>
+                        <div className="flex gap-5 text-xs text-gray-600">
+                            <Link to="/privacy-policy" className="hover:text-gray-300 transition-colors">Privacy Policy</Link>
+                            <Link to="/terms-of-service" className="hover:text-gray-300 transition-colors">Terms &amp; Conditions</Link>
+                        </div>
                     </div>
                 </div>
             </footer>

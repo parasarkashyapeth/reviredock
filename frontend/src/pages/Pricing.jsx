@@ -102,6 +102,8 @@ export default function Pricing() {
         {
             name: 'Pro Monthly',
             price: '₹299',
+            originalPrice: '₹399',
+            discountPct: '25% OFF',
             period: '/month',
             features: [
                 'Unlimited feedbacks',
@@ -119,6 +121,8 @@ export default function Pricing() {
         {
             name: 'Pro Yearly',
             price: '₹2,999',
+            originalPrice: '₹3,599',
+            discountPct: '17% OFF',
             period: '/year',
             savings: 'Save ₹589',
             features: [
@@ -178,6 +182,29 @@ export default function Pricing() {
         <Layout>
             <div className="animate-fadeIn">
                 <div className="text-center mb-12">
+                    {/* Offer Banner */}
+                    <div
+                        className="inline-flex items-center gap-3 mb-6 px-5 py-3 rounded-2xl"
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(251,146,60,0.15) 0%, rgba(239,68,68,0.1) 100%)',
+                            border: '1px solid rgba(251,146,60,0.35)',
+                            boxShadow: '0 0 30px rgba(251,146,60,0.15)',
+                            animation: 'pulse 2.5s ease-in-out infinite',
+                        }}
+                    >
+                        <span className="text-xl">🔥</span>
+                        <div className="text-left">
+                            <p className="text-sm font-bold text-orange-300">Launch Offer — Up to 25% OFF</p>
+                            <p className="text-xs text-orange-300/80">Prices increasing soon · Lock in your rate today!</p>
+                        </div>
+                        <span
+                            className="text-xs font-bold px-2.5 py-1 rounded-full"
+                            style={{ background: 'rgba(251,146,60,0.25)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.4)' }}
+                        >
+                            ENDING SOON
+                        </span>
+                    </div>
+
                     <h1
                         className="text-3xl font-bold mb-2"
                         style={{
@@ -283,9 +310,23 @@ export default function Pricing() {
                                 >
                                     {plan.name}
                                 </h3>
-                                <div className="mt-2">
+                                <div className="mt-2 flex items-baseline justify-center gap-2 flex-wrap">
                                     <span className="text-4xl font-bold text-white">{plan.price}</span>
                                     <span className="text-white/50">{plan.period}</span>
+                                    {plan.originalPrice && !plan.isCurrent && (
+                                        <span className="flex items-center gap-1.5 ml-2">
+                                            <s className="text-white/30 text-sm font-medium">{plan.originalPrice}</s>
+                                            <span
+                                                className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                                style={{ 
+                                                    background: 'linear-gradient(135deg, rgba(251,146,60,0.2) 0%, rgba(239,68,68,0.2) 100%)', 
+                                                    color: '#fb923c', 
+                                                    border: '1px solid rgba(251,146,60,0.4)',
+                                                    boxShadow: '0 0 10px rgba(251,146,60,0.1)'
+                                                }}
+                                            >{plan.discountPct}</span>
+                                        </span>
+                                    )}
                                 </div>
                                 {plan.savings && (
                                     <span
