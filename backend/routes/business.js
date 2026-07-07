@@ -196,7 +196,7 @@ Rules:
                 'X-Title': 'ReviewDock Business Idea Generator',
             },
             body: JSON.stringify({
-                model: 'z-ai/glm-4.5-air:free',
+                model: 'openrouter/free',
                 messages: [{ role: 'user', content: prompt }],
                 max_tokens: 2000,
                 temperature: 0.8,
