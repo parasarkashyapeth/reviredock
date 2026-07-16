@@ -2,7 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '../db/supabase.js';
+import { query } from '../db/neon.js';
 import { generateToken, generateRefreshToken, verifyRefreshToken, authenticate } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimit.js';
 import { generateOTP, sendOTPEmail } from '../services/email.js';
@@ -32,41 +32,33 @@ router.post('/send-otp', authLimiter, async (req, res) => {
         };
 
         // Check if email already exists
-        const { data: existingUser } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', email.toLowerCase())
-            .single();
+        const { rows: existingUsers } = await query(
+            'SELECT id FROM users WHERE email = $1',
+            [email.toLowerCase()]
+        );
 
-        if (existingUser) {
+        if (existingUsers.length > 0) {
             // Don't reveal that email exists — return same generic message
             return res.json(genericResponse);
         }
 
         // Invalidate any existing OTPs for this email
-        await supabase
-            .from('email_verification_otps')
-            .update({ verified: true })
-            .eq('email', email.toLowerCase())
-            .eq('verified', false);
+        await query(
+            'UPDATE email_verification_otps SET verified = true WHERE email = $1 AND verified = false',
+            [email.toLowerCase()]
+        );
 
         // Generate new OTP
         const otp = generateOTP();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
         // Store OTP in database
-        const { error: insertError } = await supabase
-            .from('email_verification_otps')
-            .insert({
-                email: email.toLowerCase(),
-                otp_code: otp,
-                expires_at: expiresAt.toISOString(),
-                verified: false,
-                attempts: 0
-            });
+        const { rowCount } = await query(
+            'INSERT INTO email_verification_otps (email, otp_code, expires_at, verified, attempts) VALUES ($1, $2, $3, $4, $5)',
+            [email.toLowerCase(), otp, expiresAt.toISOString(), false, 0]
+        );
 
-        if (insertError) {
-            console.error('OTP insert error:', insertError);
+        if (rowCount === 0) {
             return res.status(500).json({ error: 'Failed to generate OTP' });
         }
 
@@ -96,17 +88,14 @@ router.post('/verify-otp', authLimiter, async (req, res) => {
         }
 
         // Find valid OTP
-        const { data: otpRecord, error: otpError } = await supabase
-            .from('email_verification_otps')
-            .select('*')
-            .eq('email', email.toLowerCase())
-            .eq('otp_code', otp)
-            .eq('verified', false)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
+        const { rows: otpRows } = await query(
+            'SELECT * FROM email_verification_otps WHERE email = $1 AND otp_code = $2 AND verified = false ORDER BY created_at DESC LIMIT 1',
+            [email.toLowerCase(), otp]
+        );
 
-        if (otpError || !otpRecord) {
+        const otpRecord = otpRows[0];
+
+        if (!otpRecord) {
             return res.status(400).json({ error: 'Invalid verification code' });
         }
 
@@ -121,16 +110,16 @@ router.post('/verify-otp', authLimiter, async (req, res) => {
         }
 
         // Increment attempts
-        await supabase
-            .from('email_verification_otps')
-            .update({ attempts: otpRecord.attempts + 1 })
-            .eq('id', otpRecord.id);
+        await query(
+            'UPDATE email_verification_otps SET attempts = $1 WHERE id = $2',
+            [otpRecord.attempts + 1, otpRecord.id]
+        );
 
         // Mark as verified
-        await supabase
-            .from('email_verification_otps')
-            .update({ verified: true })
-            .eq('id', otpRecord.id);
+        await query(
+            'UPDATE email_verification_otps SET verified = true WHERE id = $1',
+            [otpRecord.id]
+        );
 
         res.json({
             verified: true,
@@ -184,11 +173,12 @@ router.post('/signup', authLimiter, async (req, res) => {
         }
 
         // Check if email already exists
-        const { data: existingUser } = await supabase
-            .from('users')
-            .select('id, google_id')
-            .eq('email', email.toLowerCase())
-            .single();
+        const { rows: existingUsers } = await query(
+            'SELECT id, google_id FROM users WHERE email = $1',
+            [email.toLowerCase()]
+        );
+
+        const existingUser = existingUsers[0];
 
         if (existingUser) {
             if (existingUser.google_id) {
@@ -209,61 +199,42 @@ router.post('/signup', authLimiter, async (req, res) => {
         const userId = uuidv4();
 
         // Create business
-        const { error: businessError } = await supabase
-            .from('businesses')
-            .insert({
-                id: businessId,
-                name: businessName,
-                category,
-                google_review_url: googleReviewUrl,
-                subscription_plan: 'free',
-                monthly_feedback_limit: 50,
-                monthly_feedback_count: 0
-            });
-
-        if (businessError) {
+        try {
+            await query(
+                'INSERT INTO businesses (id, name, category, google_review_url, subscription_plan, monthly_feedback_limit, monthly_feedback_count) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                [businessId, businessName, category, googleReviewUrl, 'free', 50, 0]
+            );
+        } catch (businessError) {
             console.error('Business creation error:', businessError);
             return res.status(500).json({ error: 'Failed to create business' });
         }
 
         // Create user
-        const { error: userError } = await supabase
-            .from('users')
-            .insert({
-                id: userId,
-                email: email.toLowerCase(),
-                password_hash: passwordHash,
-                business_id: businessId,
-                owner_name: ownerName || null,
-                profile_picture_url: profilePictureUrl || null,
-                google_id: googleId || null
-            });
-
-        if (userError) {
+        try {
+            await query(
+                'INSERT INTO users (id, email, password_hash, business_id, owner_name, profile_picture_url, google_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                [userId, email.toLowerCase(), passwordHash, businessId, ownerName || null, profilePictureUrl || null, googleId || null]
+            );
+        } catch (userError) {
             console.error('User creation error:', userError);
             // Rollback business creation
-            await supabase.from('businesses').delete().eq('id', businessId);
+            await query('DELETE FROM businesses WHERE id = $1', [businessId]);
             return res.status(500).json({ error: 'Failed to create user' });
         }
 
         // Insert review platforms if provided
         if (hasReviewPlatforms) {
-            const platformsToInsert = reviewPlatforms.map((p, idx) => ({
-                business_id: businessId,
-                platform_name: p.platform || 'custom',
-                platform_label: p.label || p.platform || 'Review Link',
-                url: p.url,
-                is_primary: p.isPrimary || idx === 0,
-                is_active: true
-            }));
-
-            const { error: platformError } = await supabase
-                .from('review_platforms')
-                .insert(platformsToInsert);
-
-            if (platformError) {
-                console.error('Review platforms insert error:', platformError);
-                // Don't fail signup, just log the error
+            for (let idx = 0; idx < reviewPlatforms.length; idx++) {
+                const p = reviewPlatforms[idx];
+                try {
+                    await query(
+                        'INSERT INTO review_platforms (business_id, platform_name, platform_label, url, is_primary, is_active) VALUES ($1, $2, $3, $4, $5, $6)',
+                        [businessId, p.platform || 'custom', p.label || p.platform || 'Review Link', p.url, p.isPrimary || idx === 0, true]
+                    );
+                } catch (platformError) {
+                    console.error('Review platforms insert error:', platformError);
+                    // Don't fail signup, just log the error
+                }
             }
         }
 
@@ -305,13 +276,18 @@ router.post('/login', authLimiter, async (req, res) => {
         }
 
         // Find user with business info
-        const { data: user, error: userError } = await supabase
-            .from('users')
-            .select('*, businesses(*)')
-            .eq('email', email.toLowerCase())
-            .single();
+        const { rows } = await query(
+            `SELECT u.*, b.name as business_name, b.category as business_category,
+                    b.subscription_plan, b.logo_url as business_logo_url
+             FROM users u
+             JOIN businesses b ON u.business_id = b.id
+             WHERE u.email = $1`,
+            [email.toLowerCase()]
+        );
 
-        if (userError || !user) {
+        const user = rows[0];
+
+        if (!user) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
@@ -333,7 +309,7 @@ router.post('/login', authLimiter, async (req, res) => {
                 id: user.id,
                 email: user.email,
                 businessId: user.business_id,
-                businessName: user.businesses.name,
+                businessName: user.business_name,
                 ownerName: user.owner_name || null,
                 profilePictureUrl: user.profile_picture_url || null,
                 isAdmin: user.is_admin || false,
@@ -382,28 +358,33 @@ router.post('/google', authLimiter, async (req, res) => {
         }
 
         // Check if user already exists
-        const { data: existingUser, error: findError } = await supabase
-            .from('users')
-            .select('*, businesses(*)')
-            .eq('email', email.toLowerCase())
-            .single();
+        const { rows } = await query(
+            `SELECT u.*, b.name as business_name, b.category as business_category,
+                    b.subscription_plan, b.logo_url as business_logo_url
+             FROM users u
+             JOIN businesses b ON u.business_id = b.id
+             WHERE u.email = $1`,
+            [email.toLowerCase()]
+        );
+
+        const existingUser = rows[0];
 
         if (existingUser) {
             // User exists - log them in
             // Update profile picture if changed
             if (picture && picture !== existingUser.profile_picture_url) {
-                await supabase
-                    .from('users')
-                    .update({ profile_picture_url: picture })
-                    .eq('id', existingUser.id);
+                await query(
+                    'UPDATE users SET profile_picture_url = $1 WHERE id = $2',
+                    [picture, existingUser.id]
+                );
             }
 
             // Update google_id if not set
             if (googleId && !existingUser.google_id) {
-                await supabase
-                    .from('users')
-                    .update({ google_id: googleId })
-                    .eq('id', existingUser.id);
+                await query(
+                    'UPDATE users SET google_id = $1 WHERE id = $2',
+                    [googleId, existingUser.id]
+                );
             }
 
             const token = generateToken({ userId: existingUser.id, businessId: existingUser.business_id });
@@ -415,7 +396,7 @@ router.post('/google', authLimiter, async (req, res) => {
                     id: existingUser.id,
                     email: existingUser.email,
                     businessId: existingUser.business_id,
-                    businessName: existingUser.businesses.name,
+                    businessName: existingUser.business_name,
                     ownerName: existingUser.owner_name || name,
                     profilePictureUrl: picture || existingUser.profile_picture_url,
                     isAdmin: existingUser.is_admin || false,
@@ -450,13 +431,18 @@ router.get('/me', authenticate, async (req, res) => {
     try {
         const { userId } = req.user;
 
-        const { data: user, error } = await supabase
-            .from('users')
-            .select('*, businesses(*)')
-            .eq('id', userId)
-            .single();
+        const { rows } = await query(
+            `SELECT u.*, b.name as business_name, b.category as business_category,
+                    b.subscription_plan, b.logo_url as business_logo_url
+             FROM users u
+             JOIN businesses b ON u.business_id = b.id
+             WHERE u.id = $1`,
+            [userId]
+        );
 
-        if (error || !user) {
+        const user = rows[0];
+
+        if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
 
@@ -464,7 +450,7 @@ router.get('/me', authenticate, async (req, res) => {
             id: user.id,
             email: user.email,
             businessId: user.business_id,
-            businessName: user.businesses.name,
+            businessName: user.business_name,
             ownerName: user.owner_name || null,
             profilePictureUrl: user.profile_picture_url || null,
             isAdmin: user.is_admin || false,
@@ -490,42 +476,37 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
         }
 
         // Find user
-        const { data: user, error: userError } = await supabase
-            .from('users')
-            .select('id, email')
-            .eq('email', email.toLowerCase())
-            .single();
+        const { rows } = await query(
+            'SELECT id, email FROM users WHERE email = $1',
+            [email.toLowerCase()]
+        );
 
-        if (userError || !user) {
+        const user = rows[0];
+
+        if (!user) {
             // Don't reveal if email exists or not for security
             return res.json({
                 message: 'If an account with that email exists, a password reset link has been generated.',
-                // In production, remove the token from response and send via email
             });
         }
 
         // Invalidate any existing tokens for this user
-        await supabase
-            .from('password_reset_tokens')
-            .update({ used: true })
-            .eq('user_id', user.id)
-            .eq('used', false);
+        await query(
+            'UPDATE password_reset_tokens SET used = true WHERE user_id = $1 AND used = false',
+            [user.id]
+        );
 
         // Generate reset token
         const resetToken = crypto.randomBytes(32).toString('hex');
         const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
 
         // Store token in database
-        const { error: tokenError } = await supabase
-            .from('password_reset_tokens')
-            .insert({
-                user_id: user.id,
-                token: resetToken,
-                expires_at: expiresAt.toISOString(),
-                used: false
-            });
-
-        if (tokenError) {
+        try {
+            await query(
+                'INSERT INTO password_reset_tokens (user_id, token, expires_at, used) VALUES ($1, $2, $3, $4)',
+                [user.id, resetToken, expiresAt.toISOString(), false]
+            );
+        } catch (tokenError) {
             console.error('Token creation error:', tokenError);
             return res.status(500).json({ error: 'Failed to create reset token' });
         }
@@ -560,24 +541,24 @@ router.post('/reset-password', authLimiter, async (req, res) => {
         }
 
         // Find valid token
-        const { data: resetToken, error: tokenError } = await supabase
-            .from('password_reset_tokens')
-            .select('*')
-            .eq('token', token)
-            .eq('used', false)
-            .single();
+        const { rows } = await query(
+            'SELECT * FROM password_reset_tokens WHERE token = $1 AND used = false',
+            [token]
+        );
 
-        if (tokenError || !resetToken) {
+        const resetToken = rows[0];
+
+        if (!resetToken) {
             return res.status(400).json({ error: 'Invalid or expired reset token' });
         }
 
         // Check if token is expired
         if (new Date(resetToken.expires_at) < new Date()) {
             // Mark token as used
-            await supabase
-                .from('password_reset_tokens')
-                .update({ used: true })
-                .eq('id', resetToken.id);
+            await query(
+                'UPDATE password_reset_tokens SET used = true WHERE id = $1',
+                [resetToken.id]
+            );
             return res.status(400).json({ error: 'Reset token has expired' });
         }
 
@@ -586,21 +567,21 @@ router.post('/reset-password', authLimiter, async (req, res) => {
         const passwordHash = await bcrypt.hash(newPassword, salt);
 
         // Update user password
-        const { error: updateError } = await supabase
-            .from('users')
-            .update({ password_hash: passwordHash })
-            .eq('id', resetToken.user_id);
+        const { rowCount } = await query(
+            'UPDATE users SET password_hash = $1 WHERE id = $2',
+            [passwordHash, resetToken.user_id]
+        );
 
-        if (updateError) {
-            console.error('Password update error:', updateError);
+        if (rowCount === 0) {
+            console.error('Password update error: no rows updated');
             return res.status(500).json({ error: 'Failed to update password' });
         }
 
         // Mark token as used
-        await supabase
-            .from('password_reset_tokens')
-            .update({ used: true })
-            .eq('id', resetToken.id);
+        await query(
+            'UPDATE password_reset_tokens SET used = true WHERE id = $1',
+            [resetToken.id]
+        );
 
         res.json({ message: 'Password reset successful. You can now login with your new password.' });
     } catch (error) {
@@ -621,13 +602,14 @@ router.get('/verify-reset-token', async (req, res) => {
             return res.status(400).json({ valid: false, error: 'Token is required' });
         }
 
-        const { data: resetToken, error } = await supabase
-            .from('password_reset_tokens')
-            .select('expires_at, used')
-            .eq('token', token)
-            .single();
+        const { rows } = await query(
+            'SELECT expires_at, used FROM password_reset_tokens WHERE token = $1',
+            [token]
+        );
 
-        if (error || !resetToken) {
+        const resetToken = rows[0];
+
+        if (!resetToken) {
             return res.json({ valid: false, error: 'Invalid token' });
         }
 
@@ -670,13 +652,14 @@ router.post('/change-password', authenticate, async (req, res) => {
         }
 
         // Get user
-        const { data: user, error: userError } = await supabase
-            .from('users')
-            .select('password_hash, google_id')
-            .eq('id', userId)
-            .single();
+        const { rows } = await query(
+            'SELECT password_hash, google_id FROM users WHERE id = $1',
+            [userId]
+        );
 
-        if (userError || !user) {
+        const user = rows[0];
+
+        if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
 
@@ -698,12 +681,12 @@ router.post('/change-password', authenticate, async (req, res) => {
         const newHash = await bcrypt.hash(newPassword, 10);
 
         // Update password
-        const { error: updateError } = await supabase
-            .from('users')
-            .update({ password_hash: newHash })
-            .eq('id', userId);
+        const { rowCount } = await query(
+            'UPDATE users SET password_hash = $1 WHERE id = $2',
+            [newHash, userId]
+        );
 
-        if (updateError) {
+        if (rowCount === 0) {
             return res.status(500).json({ error: 'Failed to update password' });
         }
 
@@ -732,13 +715,14 @@ router.post('/refresh-token', authLimiter, async (req, res) => {
         }
 
         // Verify user still exists
-        const { data: user, error } = await supabase
-            .from('users')
-            .select('id, business_id')
-            .eq('id', decoded.userId)
-            .single();
+        const { rows } = await query(
+            'SELECT id, business_id FROM users WHERE id = $1',
+            [decoded.userId]
+        );
 
-        if (error || !user) {
+        const user = rows[0];
+
+        if (!user) {
             return res.status(401).json({ error: 'User not found' });
         }
 
@@ -762,14 +746,7 @@ router.post('/refresh-token', authLimiter, async (req, res) => {
  */
 router.get('/emails', async (req, res) => {
     try {
-        const { data: users, error } = await supabase
-            .from('users')
-            .select('email');
-
-        if (error) {
-            console.error('Fetch emails error:', error);
-            return res.status(500).json({ error: 'Failed to fetch emails' });
-        }
+        const { rows: users } = await query('SELECT email FROM users');
 
         const emails = users.map(user => user.email);
         res.json({ emails });

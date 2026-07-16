@@ -18,8 +18,8 @@ if (!process.env.JWT_SECRET) {
     process.exit(1);
 }
 
-// Import Supabase client (replaces SQLite)
-import './db/supabase.js';
+// Import Neon PostgreSQL client
+import './db/neon.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -117,7 +117,7 @@ app.disable('x-powered-by');
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', database: 'supabase', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', database: 'neon', timestamp: new Date().toISOString() });
 });
 
 
@@ -142,15 +142,15 @@ app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
 });
 
-// Start server (no database initialization needed - Supabase is cloud-based)
+// Start server (no database initialization needed - Neon is cloud-based)
 app.listen(PORT, () => {
     console.log(`
 ╔════════════════════════════════════════════════════════╗
-║     🚀 Feedback System Backend (Supabase)             ║
+║     🚀 Feedback System Backend (Neon)                 ║
 ║                                                        ║
 ║     Server:    http://localhost:${PORT}                   ║
 ║     Health:    http://localhost:${PORT}/health             ║
-║     Database:  Supabase PostgreSQL (Cloud)            ║
+║     Database:  Neon PostgreSQL (Cloud)                ║
 ║                                                        ║
 ╚════════════════════════════════════════════════════════╝
     `);

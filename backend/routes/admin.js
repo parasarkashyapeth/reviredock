@@ -1,5 +1,5 @@
 import express from 'express';
-import { supabase } from '../db/supabase.js';
+import { query } from '../db/neon.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/adminAuth.js';
 
@@ -20,56 +20,42 @@ router.use(requireAdmin);
 router.get('/stats', async (req, res) => {
     try {
         // Total users
-        const { count: totalUsers } = await supabase
-            .from('users')
-            .select('*', { count: 'exact', head: true });
+        const { rows: [{ count: totalUsers }] } = await query('SELECT COUNT(*)::int as count FROM users');
 
         // Total businesses
-        const { count: totalBusinesses } = await supabase
-            .from('businesses')
-            .select('*', { count: 'exact', head: true });
+        const { rows: [{ count: totalBusinesses }] } = await query('SELECT COUNT(*)::int as count FROM businesses');
 
         // Total feedbacks
-        const { count: totalFeedbacks } = await supabase
-            .from('feedbacks')
-            .select('*', { count: 'exact', head: true });
+        const { rows: [{ count: totalFeedbacks }] } = await query('SELECT COUNT(*)::int as count FROM feedbacks');
 
         // Positive feedbacks
-        const { count: positiveFeedbacks } = await supabase
-            .from('feedbacks')
-            .select('*', { count: 'exact', head: true })
-            .eq('is_positive', true);
+        const { rows: [{ count: positiveFeedbacks }] } = await query('SELECT COUNT(*)::int as count FROM feedbacks WHERE is_positive = true');
 
         // Negative feedbacks
-        const { count: negativeFeedbacks } = await supabase
-            .from('feedbacks')
-            .select('*', { count: 'exact', head: true })
-            .eq('is_positive', false);
+        const { rows: [{ count: negativeFeedbacks }] } = await query('SELECT COUNT(*)::int as count FROM feedbacks WHERE is_positive = false');
 
         // Users created in last 7 days
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        const { count: newUsersLast7Days } = await supabase
-            .from('users')
-            .select('*', { count: 'exact', head: true })
-            .gte('created_at', sevenDaysAgo);
+        const { rows: [{ count: newUsersLast7Days }] } = await query(
+            'SELECT COUNT(*)::int as count FROM users WHERE created_at >= $1',
+            [sevenDaysAgo]
+        );
 
         // Feedbacks in last 7 days
-        const { count: newFeedbacksLast7Days } = await supabase
-            .from('feedbacks')
-            .select('*', { count: 'exact', head: true })
-            .gte('created_at', sevenDaysAgo);
+        const { rows: [{ count: newFeedbacksLast7Days }] } = await query(
+            'SELECT COUNT(*)::int as count FROM feedbacks WHERE created_at >= $1',
+            [sevenDaysAgo]
+        );
 
         // Feedbacks in last 24 hours
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const { count: feedbacksLast24h } = await supabase
-            .from('feedbacks')
-            .select('*', { count: 'exact', head: true })
-            .gte('created_at', oneDayAgo);
+        const { rows: [{ count: feedbacksLast24h }] } = await query(
+            'SELECT COUNT(*)::int as count FROM feedbacks WHERE created_at >= $1',
+            [oneDayAgo]
+        );
 
         // Subscription breakdown
-        const { data: planBreakdown } = await supabase
-            .from('businesses')
-            .select('subscription_plan');
+        const { rows: planBreakdown } = await query('SELECT subscription_plan FROM businesses');
 
         const plans = {};
         (planBreakdown || []).forEach(b => {
@@ -79,28 +65,26 @@ router.get('/stats', async (req, res) => {
 
         // Recent signups trend (last 30 days, grouped by day)
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        const { data: recentUsers } = await supabase
-            .from('users')
-            .select('created_at')
-            .gte('created_at', thirtyDaysAgo)
-            .order('created_at', { ascending: true });
+        const { rows: recentUsers } = await query(
+            'SELECT created_at FROM users WHERE created_at >= $1 ORDER BY created_at ASC',
+            [thirtyDaysAgo]
+        );
 
         const signupTrend = {};
         (recentUsers || []).forEach(u => {
-            const day = u.created_at.split('T')[0];
+            const day = new Date(u.created_at).toISOString().split('T')[0];
             signupTrend[day] = (signupTrend[day] || 0) + 1;
         });
 
         // Recent feedback trend (last 30 days)
-        const { data: recentFeedbacks } = await supabase
-            .from('feedbacks')
-            .select('created_at, is_positive')
-            .gte('created_at', thirtyDaysAgo)
-            .order('created_at', { ascending: true });
+        const { rows: recentFeedbacks } = await query(
+            'SELECT created_at, is_positive FROM feedbacks WHERE created_at >= $1 ORDER BY created_at ASC',
+            [thirtyDaysAgo]
+        );
 
         const feedbackTrend = {};
         (recentFeedbacks || []).forEach(f => {
-            const day = f.created_at.split('T')[0];
+            const day = new Date(f.created_at).toISOString().split('T')[0];
             if (!feedbackTrend[day]) feedbackTrend[day] = { positive: 0, negative: 0 };
             if (f.is_positive) feedbackTrend[day].positive++;
             else feedbackTrend[day].negative++;
@@ -137,29 +121,59 @@ router.get('/users', async (req, res) => {
     try {
         const { page = 1, limit = 20, search = '' } = req.query;
         const offset = (parseInt(page) - 1) * parseInt(limit);
+        const lim = parseInt(limit);
 
-        let query = supabase
-            .from('users')
-            .select('id, email, owner_name, profile_picture_url, google_id, is_admin, created_at, business_id, businesses(name, category, subscription_plan)', { count: 'exact' });
+        let sql, countSql;
+        const params = [];
+        let paramIdx = 1;
 
         if (search) {
-            query = query.or(`email.ilike.%${search}%,owner_name.ilike.%${search}%`);
+            const searchPattern = `%${search}%`;
+            countSql = `SELECT COUNT(*)::int as count FROM users WHERE email ILIKE $1 OR owner_name ILIKE $1`;
+            sql = `SELECT u.id, u.email, u.owner_name, u.profile_picture_url, u.google_id, u.is_admin, u.created_at, u.business_id,
+                          b.name as business_name, b.category as business_category, b.subscription_plan
+                   FROM users u
+                   LEFT JOIN businesses b ON u.business_id = b.id
+                   WHERE u.email ILIKE $1 OR u.owner_name ILIKE $1
+                   ORDER BY u.created_at DESC
+                   LIMIT $2 OFFSET $3`;
+            params.push(searchPattern, lim, offset);
+        } else {
+            countSql = 'SELECT COUNT(*)::int as count FROM users';
+            sql = `SELECT u.id, u.email, u.owner_name, u.profile_picture_url, u.google_id, u.is_admin, u.created_at, u.business_id,
+                          b.name as business_name, b.category as business_category, b.subscription_plan
+                   FROM users u
+                   LEFT JOIN businesses b ON u.business_id = b.id
+                   ORDER BY u.created_at DESC
+                   LIMIT $1 OFFSET $2`;
+            params.push(lim, offset);
         }
 
-        const { data: users, count, error } = await query
-            .order('created_at', { ascending: false })
-            .range(offset, offset + parseInt(limit) - 1);
+        const { rows: [{ count }] } = await query(countSql, search ? [`%${search}%`] : []);
+        const { rows: users } = await query(sql, params);
 
-        if (error) {
-            console.error('Admin users query error:', error);
-            return res.status(500).json({ error: 'Failed to fetch users' });
-        }
+        // Transform to match old format with nested businesses object
+        const transformed = users.map(u => ({
+            id: u.id,
+            email: u.email,
+            owner_name: u.owner_name,
+            profile_picture_url: u.profile_picture_url,
+            google_id: u.google_id,
+            is_admin: u.is_admin,
+            created_at: u.created_at,
+            business_id: u.business_id,
+            businesses: {
+                name: u.business_name,
+                category: u.business_category,
+                subscription_plan: u.subscription_plan,
+            }
+        }));
 
         res.json({
-            users: users || [],
+            users: transformed,
             total: count || 0,
             page: parseInt(page),
-            totalPages: Math.ceil((count || 0) / parseInt(limit)),
+            totalPages: Math.ceil((count || 0) / lim),
         });
     } catch (error) {
         console.error('Admin get users error:', error);
@@ -182,36 +196,33 @@ router.delete('/users/:id', async (req, res) => {
         }
 
         // Get the user to find business_id before deleting
-        const { data: targetUser, error: findError } = await supabase
-            .from('users')
-            .select('id, business_id')
-            .eq('id', id)
-            .single();
+        const { rows: targetRows } = await query(
+            'SELECT id, business_id FROM users WHERE id = $1',
+            [id]
+        );
 
-        if (findError || !targetUser) {
+        const targetUser = targetRows[0];
+
+        if (!targetUser) {
             return res.status(404).json({ error: 'User not found' });
         }
 
         // Delete user (cascades from business if only user)
-        const { error: deleteError } = await supabase
-            .from('users')
-            .delete()
-            .eq('id', id);
+        const { rowCount } = await query('DELETE FROM users WHERE id = $1', [id]);
 
-        if (deleteError) {
-            console.error('Admin delete user error:', deleteError);
+        if (rowCount === 0) {
             return res.status(500).json({ error: 'Failed to delete user' });
         }
 
         // Check if business has other users
-        const { count: remainingUsers } = await supabase
-            .from('users')
-            .select('*', { count: 'exact', head: true })
-            .eq('business_id', targetUser.business_id);
+        const { rows: [{ count: remainingUsers }] } = await query(
+            'SELECT COUNT(*)::int as count FROM users WHERE business_id = $1',
+            [targetUser.business_id]
+        );
 
         // If no more users for this business, delete the business too
         if (remainingUsers === 0) {
-            await supabase.from('businesses').delete().eq('id', targetUser.business_id);
+            await query('DELETE FROM businesses WHERE id = $1', [targetUser.business_id]);
         }
 
         res.json({ message: 'User deleted successfully' });
@@ -236,25 +247,25 @@ router.patch('/users/:id/toggle-admin', async (req, res) => {
         }
 
         // Get current admin status
-        const { data: user, error: findError } = await supabase
-            .from('users')
-            .select('is_admin')
-            .eq('id', id)
-            .single();
+        const { rows } = await query(
+            'SELECT is_admin FROM users WHERE id = $1',
+            [id]
+        );
 
-        if (findError || !user) {
+        const user = rows[0];
+
+        if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
 
         const newStatus = !user.is_admin;
 
-        const { error: updateError } = await supabase
-            .from('users')
-            .update({ is_admin: newStatus })
-            .eq('id', id);
+        const { rowCount } = await query(
+            'UPDATE users SET is_admin = $1 WHERE id = $2',
+            [newStatus, id]
+        );
 
-        if (updateError) {
-            console.error('Admin toggle error:', updateError);
+        if (rowCount === 0) {
             return res.status(500).json({ error: 'Failed to update admin status' });
         }
 
@@ -277,37 +288,37 @@ router.get('/businesses', async (req, res) => {
     try {
         const { page = 1, limit = 20, search = '' } = req.query;
         const offset = (parseInt(page) - 1) * parseInt(limit);
+        const lim = parseInt(limit);
 
-        let query = supabase
-            .from('businesses')
-            .select('*', { count: 'exact' });
+        let sql, countSql;
+        const params = [];
 
         if (search) {
-            query = query.or(`name.ilike.%${search}%,category.ilike.%${search}%`);
+            const searchPattern = `%${search}%`;
+            countSql = `SELECT COUNT(*)::int as count FROM businesses WHERE name ILIKE $1 OR category ILIKE $1`;
+            sql = `SELECT * FROM businesses WHERE name ILIKE $1 OR category ILIKE $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
+            params.push(searchPattern, lim, offset);
+        } else {
+            countSql = 'SELECT COUNT(*)::int as count FROM businesses';
+            sql = 'SELECT * FROM businesses ORDER BY created_at DESC LIMIT $1 OFFSET $2';
+            params.push(lim, offset);
         }
 
-        const { data: businesses, count, error } = await query
-            .order('created_at', { ascending: false })
-            .range(offset, offset + parseInt(limit) - 1);
-
-        if (error) {
-            console.error('Admin businesses query error:', error);
-            return res.status(500).json({ error: 'Failed to fetch businesses' });
-        }
+        const { rows: [{ count }] } = await query(countSql, search ? [`%${search}%`] : []);
+        const { rows: businesses } = await query(sql, params);
 
         // Get feedback counts per business
-        const businessIds = (businesses || []).map(b => b.id);
         const enriched = await Promise.all(
             (businesses || []).map(async (b) => {
-                const { count: feedbackCount } = await supabase
-                    .from('feedbacks')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('business_id', b.id);
+                const { rows: [{ count: feedbackCount }] } = await query(
+                    'SELECT COUNT(*)::int as count FROM feedbacks WHERE business_id = $1',
+                    [b.id]
+                );
 
-                const { count: userCount } = await supabase
-                    .from('users')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('business_id', b.id);
+                const { rows: [{ count: userCount }] } = await query(
+                    'SELECT COUNT(*)::int as count FROM users WHERE business_id = $1',
+                    [b.id]
+                );
 
                 return { ...b, feedbackCount: feedbackCount || 0, userCount: userCount || 0 };
             })
@@ -317,7 +328,7 @@ router.get('/businesses', async (req, res) => {
             businesses: enriched,
             total: count || 0,
             page: parseInt(page),
-            totalPages: Math.ceil((count || 0) / parseInt(limit)),
+            totalPages: Math.ceil((count || 0) / lim),
         });
     } catch (error) {
         console.error('Admin get businesses error:', error);
@@ -338,18 +349,18 @@ router.patch('/businesses/:id/plan', async (req, res) => {
             return res.status(400).json({ error: 'Plan is required' });
         }
 
-        const updateData = { subscription_plan: plan };
+        let sql, params;
         if (feedbackLimit !== undefined) {
-            updateData.monthly_feedback_limit = parseInt(feedbackLimit);
+            sql = 'UPDATE businesses SET subscription_plan = $1, monthly_feedback_limit = $2 WHERE id = $3';
+            params = [plan, parseInt(feedbackLimit), id];
+        } else {
+            sql = 'UPDATE businesses SET subscription_plan = $1 WHERE id = $2';
+            params = [plan, id];
         }
 
-        const { error } = await supabase
-            .from('businesses')
-            .update(updateData)
-            .eq('id', id);
+        const { rowCount } = await query(sql, params);
 
-        if (error) {
-            console.error('Admin update plan error:', error);
+        if (rowCount === 0) {
             return res.status(500).json({ error: 'Failed to update plan' });
         }
 
@@ -369,24 +380,19 @@ router.delete('/businesses/:id', async (req, res) => {
         const { id } = req.params;
 
         // Check the business exists
-        const { data: business, error: findError } = await supabase
-            .from('businesses')
-            .select('id')
-            .eq('id', id)
-            .single();
+        const { rows } = await query(
+            'SELECT id FROM businesses WHERE id = $1',
+            [id]
+        );
 
-        if (findError || !business) {
+        if (rows.length === 0) {
             return res.status(404).json({ error: 'Business not found' });
         }
 
         // Delete business (cascades to users, feedbacks, platforms)
-        const { error: deleteError } = await supabase
-            .from('businesses')
-            .delete()
-            .eq('id', id);
+        const { rowCount } = await query('DELETE FROM businesses WHERE id = $1', [id]);
 
-        if (deleteError) {
-            console.error('Admin delete business error:', deleteError);
+        if (rowCount === 0) {
             return res.status(500).json({ error: 'Failed to delete business' });
         }
 
@@ -409,35 +415,52 @@ router.get('/feedbacks', async (req, res) => {
     try {
         const { page = 1, limit = 20, type = 'all', search = '' } = req.query;
         const offset = (parseInt(page) - 1) * parseInt(limit);
+        const lim = parseInt(limit);
 
-        let query = supabase
-            .from('feedbacks')
-            .select('*, businesses(name)', { count: 'exact' });
+        let conditions = [];
+        const params = [];
+        let paramIdx = 1;
 
         if (type === 'positive') {
-            query = query.eq('is_positive', true);
+            conditions.push(`f.is_positive = true`);
         } else if (type === 'negative') {
-            query = query.eq('is_positive', false);
+            conditions.push(`f.is_positive = false`);
         }
 
         if (search) {
-            query = query.ilike('message', `%${search}%`);
+            conditions.push(`f.message ILIKE $${paramIdx}`);
+            params.push(`%${search}%`);
+            paramIdx++;
         }
 
-        const { data: feedbacks, count, error } = await query
-            .order('created_at', { ascending: false })
-            .range(offset, offset + parseInt(limit) - 1);
+        const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-        if (error) {
-            console.error('Admin feedbacks query error:', error);
-            return res.status(500).json({ error: 'Failed to fetch feedbacks' });
-        }
+        const { rows: [{ count }] } = await query(
+            `SELECT COUNT(*)::int as count FROM feedbacks f ${whereClause}`,
+            params
+        );
+
+        const { rows: feedbacks } = await query(
+            `SELECT f.*, b.name as business_name
+             FROM feedbacks f
+             LEFT JOIN businesses b ON f.business_id = b.id
+             ${whereClause}
+             ORDER BY f.created_at DESC
+             LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+            [...params, lim, offset]
+        );
+
+        // Transform to match old format with nested businesses
+        const transformed = feedbacks.map(f => ({
+            ...f,
+            businesses: { name: f.business_name }
+        }));
 
         res.json({
-            feedbacks: feedbacks || [],
+            feedbacks: transformed || [],
             total: count || 0,
             page: parseInt(page),
-            totalPages: Math.ceil((count || 0) / parseInt(limit)),
+            totalPages: Math.ceil((count || 0) / lim),
         });
     } catch (error) {
         console.error('Admin get feedbacks error:', error);
@@ -453,13 +476,9 @@ router.delete('/feedbacks/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
-        const { error } = await supabase
-            .from('feedbacks')
-            .delete()
-            .eq('id', id);
+        const { rowCount } = await query('DELETE FROM feedbacks WHERE id = $1', [id]);
 
-        if (error) {
-            console.error('Admin delete feedback error:', error);
+        if (rowCount === 0) {
             return res.status(500).json({ error: 'Failed to delete feedback' });
         }
 
@@ -482,35 +501,54 @@ router.get('/payments', async (req, res) => {
     try {
         const { page = 1, limit = 20, status = 'all', search = '' } = req.query;
         const offset = (parseInt(page) - 1) * parseInt(limit);
+        const lim = parseInt(limit);
 
-        let query = supabase
-            .from('payments')
-            .select('*, businesses(name), users(email, owner_name)', { count: 'exact' });
+        let conditions = [];
+        const params = [];
+        let paramIdx = 1;
 
         if (status !== 'all') {
-            query = query.eq('status', status);
+            conditions.push(`p.status = $${paramIdx}`);
+            params.push(status);
+            paramIdx++;
         }
 
-        // We can't trivially search relation fields with simple supabase ilike without inner join,
-        // so we'll just do simple filter on reference_id or plan_id for now if search is provided
         if (search) {
-            query = query.ilike('reference_id', `%${search}%`);
+            conditions.push(`p.reference_id ILIKE $${paramIdx}`);
+            params.push(`%${search}%`);
+            paramIdx++;
         }
 
-        const { data: payments, count, error } = await query
-            .order('created_at', { ascending: false })
-            .range(offset, offset + parseInt(limit) - 1);
+        const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-        if (error) {
-            console.error('Admin payments query error:', error);
-            return res.status(500).json({ error: 'Failed to fetch payments' });
-        }
+        const { rows: [{ count }] } = await query(
+            `SELECT COUNT(*)::int as count FROM payments p ${whereClause}`,
+            params
+        );
+
+        const { rows: payments } = await query(
+            `SELECT p.*, b.name as business_name, u.email as user_email, u.owner_name as user_owner_name
+             FROM payments p
+             LEFT JOIN businesses b ON p.business_id = b.id
+             LEFT JOIN users u ON p.user_id = u.id
+             ${whereClause}
+             ORDER BY p.created_at DESC
+             LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+            [...params, lim, offset]
+        );
+
+        // Transform to match old nested format
+        const transformed = payments.map(p => ({
+            ...p,
+            businesses: { name: p.business_name },
+            users: { email: p.user_email, owner_name: p.user_owner_name }
+        }));
 
         res.json({
-            payments: payments || [],
+            payments: transformed || [],
             total: count || 0,
             page: parseInt(page),
-            totalPages: Math.ceil((count || 0) / parseInt(limit)),
+            totalPages: Math.ceil((count || 0) / lim),
         });
     } catch (error) {
         console.error('Admin get payments error:', error);

@@ -1,5 +1,5 @@
 import express from 'express';
-import { supabase } from '../db/supabase.js';
+import { query } from '../db/neon.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -43,13 +43,12 @@ router.post('/avatar', authenticate, async (req, res) => {
         }
 
         // Store the base64 image directly in the database
-        const { error: updateError } = await supabase
-            .from('users')
-            .update({ profile_picture_url: imageData })
-            .eq('id', userId);
+        const { rowCount } = await query(
+            'UPDATE users SET profile_picture_url = $1 WHERE id = $2',
+            [imageData, userId]
+        );
 
-        if (updateError) {
-            console.error('Update error:', updateError);
+        if (rowCount === 0) {
             return res.status(500).json({ error: 'Failed to update profile' });
         }
 
@@ -72,12 +71,12 @@ router.delete('/avatar', authenticate, async (req, res) => {
         const { userId } = req.user;
 
         // Clear profile picture URL
-        const { error: updateError } = await supabase
-            .from('users')
-            .update({ profile_picture_url: null })
-            .eq('id', userId);
+        const { rowCount } = await query(
+            'UPDATE users SET profile_picture_url = NULL WHERE id = $1',
+            [userId]
+        );
 
-        if (updateError) {
+        if (rowCount === 0) {
             return res.status(500).json({ error: 'Failed to update profile' });
         }
 

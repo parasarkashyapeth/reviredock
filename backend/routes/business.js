@@ -1,7 +1,7 @@
 import express from 'express';
 import QRCode from 'qrcode';
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '../db/supabase.js';
+import { query } from '../db/neon.js';
 import { authenticate } from '../middleware/auth.js';
 import { analyzeBulkSummary } from '../services/ai.js';
 import { isSafeUrl } from '../middleware/sanitize.js';
@@ -22,13 +22,14 @@ router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
-        const { data: business, error } = await supabase
-            .from('businesses')
-            .select('id, name, category, logo_url, google_review_url')
-            .eq('id', id)
-            .single();
+        const { rows } = await query(
+            'SELECT id, name, category, logo_url, google_review_url FROM businesses WHERE id = $1',
+            [id]
+        );
 
-        if (error || !business) {
+        const business = rows[0];
+
+        if (!business) {
             return res.status(404).json({ error: 'Business not found' });
         }
 
@@ -405,31 +406,33 @@ router.put('/profile', authenticate, async (req, res) => {
         }
 
         // Update business
-        const businessUpdates = {
-            name: businessName,
-            category,
-        };
-        if (logoUrl !== undefined) businessUpdates.logo_url = logoUrl;
+        let bizSql = 'UPDATE businesses SET name = $1, category = $2';
+        const bizParams = [businessName, category];
+        let bizIdx = 3;
 
-        const { error: bizError } = await supabase
-            .from('businesses')
-            .update(businessUpdates)
-            .eq('id', businessId);
+        if (logoUrl !== undefined) {
+            bizSql += `, logo_url = $${bizIdx}`;
+            bizParams.push(logoUrl);
+            bizIdx++;
+        }
 
-        if (bizError) {
-            console.error('Profile update - business error:', bizError);
+        bizSql += ` WHERE id = $${bizIdx}`;
+        bizParams.push(businessId);
+
+        const { rowCount: bizCount } = await query(bizSql, bizParams);
+
+        if (bizCount === 0) {
             return res.status(500).json({ error: 'Failed to update business' });
         }
 
         // Update owner name on user record
         if (ownerName !== undefined) {
-            const { error: userError } = await supabase
-                .from('users')
-                .update({ owner_name: ownerName })
-                .eq('id', userId);
-
-            if (userError) {
-                console.error('Profile update - user error:', userError);
+            const { rowCount } = await query(
+                'UPDATE users SET owner_name = $1 WHERE id = $2',
+                [ownerName, userId]
+            );
+            if (rowCount === 0) {
+                console.error('Profile update - user error: no rows updated');
                 // Don't fail the whole request for this
             }
         }
@@ -456,18 +459,25 @@ router.put('/:id', authenticate, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized to update this business' });
         }
 
-        const updates = {};
-        if (name) updates.name = name;
-        if (category) updates.category = category;
-        if (googleReviewUrl) updates.google_review_url = googleReviewUrl;
-        if (logoUrl !== undefined) updates.logo_url = logoUrl;
+        const updates = [];
+        const params = [];
+        let paramIdx = 1;
 
-        const { error } = await supabase
-            .from('businesses')
-            .update(updates)
-            .eq('id', id);
+        if (name) { updates.push(`name = $${paramIdx}`); params.push(name); paramIdx++; }
+        if (category) { updates.push(`category = $${paramIdx}`); params.push(category); paramIdx++; }
+        if (googleReviewUrl) { updates.push(`google_review_url = $${paramIdx}`); params.push(googleReviewUrl); paramIdx++; }
+        if (logoUrl !== undefined) { updates.push(`logo_url = $${paramIdx}`); params.push(logoUrl); paramIdx++; }
 
-        if (error) {
+        if (updates.length === 0) {
+            return res.json({ message: 'No updates provided' });
+        }
+
+        params.push(id);
+        const sql = `UPDATE businesses SET ${updates.join(', ')} WHERE id = $${paramIdx}`;
+
+        const { rowCount } = await query(sql, params);
+
+        if (rowCount === 0) {
             return res.status(500).json({ error: 'Failed to update business' });
         }
 
@@ -494,20 +504,12 @@ router.get('/:id/platforms', authenticate, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        const { data: platforms, error } = await supabase
-            .from('review_platforms')
-            .select('*')
-            .eq('business_id', id)
-            .eq('is_active', true)
-            .order('is_primary', { ascending: false })
-            .order('created_at', { ascending: true });
+        const { rows: platforms } = await query(
+            'SELECT * FROM review_platforms WHERE business_id = $1 AND is_active = true ORDER BY is_primary DESC, created_at ASC',
+            [id]
+        );
 
-        if (error) {
-            console.error('[GET platforms] Supabase error:', JSON.stringify(error));
-            return res.status(500).json({ error: 'Failed to get platforms' });
-        }
-
-        console.log('[GET platforms] Found', (platforms || []).length, 'platforms:', JSON.stringify(platforms));
+        console.log('[GET platforms] Found', (platforms || []).length, 'platforms');
         res.json({ platforms: platforms || [] });
     } catch (error) {
         console.error('Get platforms error:', error);
@@ -542,41 +544,33 @@ router.post('/:id/platforms', authenticate, async (req, res) => {
 
         // If setting as primary, unset other primaries
         if (isPrimary) {
-            await supabase
-                .from('review_platforms')
-                .update({ is_primary: false })
-                .eq('business_id', id);
+            await query(
+                'UPDATE review_platforms SET is_primary = false WHERE business_id = $1',
+                [id]
+            );
         }
 
         // Check for duplicate URL
-        const { data: existing } = await supabase
-            .from('review_platforms')
-            .select('id')
-            .eq('business_id', id)
-            .eq('url', url)
-            .single();
+        const { rows: existingRows } = await query(
+            'SELECT id FROM review_platforms WHERE business_id = $1 AND url = $2',
+            [id, url]
+        );
 
-        if (existing) {
+        if (existingRows.length > 0) {
             console.log('[POST platform] Duplicate URL found:', url);
             return res.status(400).json({ error: 'This URL is already added' });
         }
 
         // Insert new platform
-        const { data: newPlatform, error } = await supabase
-            .from('review_platforms')
-            .insert({
-                business_id: id,
-                platform_name: platform,
-                platform_label: finalLabel,
-                url,
-                is_primary: isPrimary,
-                is_active: true
-            })
-            .select()
-            .single();
+        const { rows: newPlatformRows } = await query(
+            `INSERT INTO review_platforms (business_id, platform_name, platform_label, url, is_primary, is_active)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [id, platform, finalLabel, url, isPrimary, true]
+        );
 
-        if (error) {
-            console.error('[POST platform] Insert error:', JSON.stringify(error));
+        const newPlatform = newPlatformRows[0];
+
+        if (!newPlatform) {
             return res.status(500).json({ error: 'Failed to add platform' });
         }
 
@@ -584,10 +578,10 @@ router.post('/:id/platforms', authenticate, async (req, res) => {
 
         // Also update the legacy google_review_url if this is primary
         if (isPrimary) {
-            await supabase
-                .from('businesses')
-                .update({ google_review_url: url })
-                .eq('id', id);
+            await query(
+                'UPDATE businesses SET google_review_url = $1 WHERE id = $2',
+                [url, id]
+            );
         }
 
         res.json({
@@ -614,54 +608,57 @@ router.put('/:id/platforms/:platformId', authenticate, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        const updates = {};
+        const updates = [];
+        const params = [];
+        let paramIdx = 1;
 
         if (url) {
-            const { platform, label } = detectPlatform(url);
-            updates.url = url;
-            updates.platform_name = platform;
-            updates.platform_label = customLabel || label;
+            const { platform: detectedPlatform, label: detectedLabel } = detectPlatform(url);
+            updates.push(`url = $${paramIdx}`); params.push(url); paramIdx++;
+            updates.push(`platform_name = $${paramIdx}`); params.push(detectedPlatform); paramIdx++;
+            updates.push(`platform_label = $${paramIdx}`); params.push(customLabel || detectedLabel); paramIdx++;
         }
 
-        if (customLabel) {
-            updates.platform_label = customLabel;
+        if (customLabel && !url) {
+            updates.push(`platform_label = $${paramIdx}`); params.push(customLabel); paramIdx++;
         }
 
         if (typeof isActive === 'boolean') {
-            updates.is_active = isActive;
+            updates.push(`is_active = $${paramIdx}`); params.push(isActive); paramIdx++;
         }
 
         // Handle primary flag
         if (isPrimary === true) {
             // Unset other primaries first
-            await supabase
-                .from('review_platforms')
-                .update({ is_primary: false })
-                .eq('business_id', id);
-            updates.is_primary = true;
+            await query(
+                'UPDATE review_platforms SET is_primary = false WHERE business_id = $1',
+                [id]
+            );
+            updates.push(`is_primary = true`);
         } else if (isPrimary === false) {
-            updates.is_primary = false;
+            updates.push(`is_primary = false`);
         }
 
-        const { data: updatedPlatform, error } = await supabase
-            .from('review_platforms')
-            .update(updates)
-            .eq('id', platformId)
-            .eq('business_id', id)
-            .select()
-            .single();
+        if (updates.length === 0) {
+            return res.json({ message: 'No updates provided' });
+        }
 
-        if (error) {
-            console.error('Update platform error:', error);
+        params.push(platformId, id);
+        const sql = `UPDATE review_platforms SET ${updates.join(', ')} WHERE id = $${paramIdx} AND business_id = $${paramIdx + 1} RETURNING *`;
+
+        const { rows } = await query(sql, params);
+        const updatedPlatform = rows[0];
+
+        if (!updatedPlatform) {
             return res.status(500).json({ error: 'Failed to update platform' });
         }
 
         // Update legacy google_review_url if this became primary
-        if (updates.is_primary && updatedPlatform?.url) {
-            await supabase
-                .from('businesses')
-                .update({ google_review_url: updatedPlatform.url })
-                .eq('id', id);
+        if (isPrimary === true && updatedPlatform?.url) {
+            await query(
+                'UPDATE businesses SET google_review_url = $1 WHERE id = $2',
+                [updatedPlatform.url, id]
+            );
         }
 
         res.json({
@@ -687,14 +684,12 @@ router.delete('/:id/platforms/:platformId', authenticate, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        const { error } = await supabase
-            .from('review_platforms')
-            .delete()
-            .eq('id', platformId)
-            .eq('business_id', id);
+        const { rowCount } = await query(
+            'DELETE FROM review_platforms WHERE id = $1 AND business_id = $2',
+            [platformId, id]
+        );
 
-        if (error) {
-            console.error('Delete platform error:', error);
+        if (rowCount === 0) {
             return res.status(500).json({ error: 'Failed to delete platform' });
         }
 
@@ -719,13 +714,14 @@ router.get('/:id/qr', authenticate, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized to access this business' });
         }
 
-        const { data: business, error } = await supabase
-            .from('businesses')
-            .select('id, name')
-            .eq('id', id)
-            .single();
+        const { rows } = await query(
+            'SELECT id, name FROM businesses WHERE id = $1',
+            [id]
+        );
 
-        if (error || !business) {
+        const business = rows[0];
+
+        if (!business) {
             return res.status(404).json({ error: 'Business not found' });
         }
 
@@ -794,21 +790,18 @@ router.get('/:id/stats', authenticate, async (req, res) => {
             prevDateFilter = { start: startOfLastYear.toISOString(), end: startOfYear.toISOString() };
         }
 
-        // Build query — fetch all fields (use * to be resilient to missing columns)
-        let query = supabase
-            .from('feedbacks')
-            .select('*')
-            .eq('business_id', id);
+        // Build query
+        let sql = 'SELECT * FROM feedbacks WHERE business_id = $1';
+        const params = [id];
+        let paramIdx = 2;
 
         if (dateFilter) {
-            query = query.gte('created_at', dateFilter);
+            sql += ` AND created_at >= $${paramIdx}`;
+            params.push(dateFilter);
+            paramIdx++;
         }
 
-        const { data: feedbacks, error } = await query;
-
-        if (error) {
-            return res.status(500).json({ error: 'Failed to get statistics' });
-        }
+        const { rows: feedbacks } = await query(sql, params);
 
         const total = feedbacks?.length || 0;
         const positive = feedbacks?.filter(f => f.is_positive).length || 0;
@@ -848,14 +841,11 @@ router.get('/:id/stats', authenticate, async (req, res) => {
         // Period comparison - fetch previous period data
         let comparison = null;
         if (prevDateFilter) {
-            let prevQuery = supabase
-                .from('feedbacks')
-                .select('rating, is_positive')
-                .eq('business_id', id)
-                .gte('created_at', prevDateFilter.start)
-                .lt('created_at', prevDateFilter.end);
+            const { rows: prevFeedbacks } = await query(
+                'SELECT rating, is_positive FROM feedbacks WHERE business_id = $1 AND created_at >= $2 AND created_at < $3',
+                [id, prevDateFilter.start, prevDateFilter.end]
+            );
 
-            const { data: prevFeedbacks } = await prevQuery;
             const prevTotal = prevFeedbacks?.length || 0;
             const prevPositive = prevFeedbacks?.filter(f => f.is_positive).length || 0;
             const prevNegative = prevTotal - prevPositive;
@@ -915,13 +905,14 @@ router.get('/:id/plan', authenticate, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized to access this business' });
         }
 
-        const { data: business, error } = await supabase
-            .from('businesses')
-            .select('subscription_plan, monthly_feedback_limit, monthly_feedback_count, last_reset_date')
-            .eq('id', id)
-            .single();
+        const { rows } = await query(
+            'SELECT subscription_plan, monthly_feedback_limit, monthly_feedback_count, last_reset_date FROM businesses WHERE id = $1',
+            [id]
+        );
 
-        if (error || !business) {
+        const business = rows[0];
+
+        if (!business) {
             return res.status(404).json({ error: 'Business not found' });
         }
 
@@ -960,22 +951,16 @@ router.get('/:id/alerts', authenticate, async (req, res) => {
         }
 
         // Get unread negative feedback count
-        const { data: unreadFeedbacks, error: countError } = await supabase
-            .from('feedbacks')
-            .select('id')
-            .eq('business_id', id)
-            .eq('is_positive', false)
-            .eq('notified', false);
+        const { rows: unreadFeedbacks } = await query(
+            'SELECT id FROM feedbacks WHERE business_id = $1 AND is_positive = false AND notified = false',
+            [id]
+        );
 
         // Get new negative feedbacks
-        const { data: newNegative, error: feedbackError } = await supabase
-            .from('feedbacks')
-            .select('id, rating, message, created_at')
-            .eq('business_id', id)
-            .eq('is_positive', false)
-            .eq('notified', false)
-            .order('created_at', { ascending: false })
-            .limit(5);
+        const { rows: newNegative } = await query(
+            'SELECT id, rating, message, created_at FROM feedbacks WHERE business_id = $1 AND is_positive = false AND notified = false ORDER BY created_at DESC LIMIT 5',
+            [id]
+        );
 
         res.json({
             unreadCount: unreadFeedbacks?.length || 0,
@@ -1005,17 +990,14 @@ router.post('/:id/alerts/mark-notified', authenticate, async (req, res) => {
             return res.status(400).json({ error: 'feedbackIds array required' });
         }
 
-        const { error } = await supabase
-            .from('feedbacks')
-            .update({ notified: true })
-            .in('id', feedbackIds)
-            .eq('business_id', id);
+        // Build parameterized IN clause
+        const placeholders = feedbackIds.map((_, i) => `$${i + 1}`).join(', ');
+        const { rowCount } = await query(
+            `UPDATE feedbacks SET notified = true WHERE id IN (${placeholders}) AND business_id = $${feedbackIds.length + 1}`,
+            [...feedbackIds, id]
+        );
 
-        if (error) {
-            return res.status(500).json({ error: 'Failed to mark as notified' });
-        }
-
-        res.json({ success: true, marked: feedbackIds.length });
+        res.json({ success: true, marked: rowCount });
     } catch (error) {
         console.error('Mark notified error:', error);
         res.status(500).json({ error: 'Failed to mark as notified' });
@@ -1025,10 +1007,6 @@ router.post('/:id/alerts/mark-notified', authenticate, async (req, res) => {
 /**
  * GET /api/business/:id/analytics
  * Get analytics data for charts (authenticated)
- * Query params:
- * - range: 'week', 'month', 'year', 'custom'
- * - startDate: ISO date string (for custom range)
- * - endDate: ISO date string (for custom range)
  */
 router.get('/:id/analytics', authenticate, async (req, res) => {
     try {
@@ -1042,9 +1020,8 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
 
         const now = new Date();
         let fromDate, toDate = now;
-        let groupBy = 'day'; // day, week, month
+        let groupBy = 'day';
 
-        // Calculate date range
         if (range === 'week') {
             fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
             groupBy = 'day';
@@ -1052,34 +1029,28 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
             fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
             groupBy = 'day';
         } else if (range === 'year') {
-            fromDate = new Date(now.getFullYear(), 0, 1); // Start of year
+            fromDate = new Date(now.getFullYear(), 0, 1);
             groupBy = 'month';
         } else if (range === 'custom' && startDate && endDate) {
             fromDate = new Date(startDate);
             toDate = new Date(endDate);
-            // If range > 60 days, group by week; if > 180 days, group by month
             const daysDiff = (toDate - fromDate) / (1000 * 60 * 60 * 24);
             if (daysDiff > 180) groupBy = 'month';
             else if (daysDiff > 60) groupBy = 'week';
             else groupBy = 'day';
         } else {
-            // Default: last 7 days
             fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
             groupBy = 'day';
         }
 
-        // Fetch all feedbacks in range — include more fields for advanced analytics
-        const { data: feedbacks, error } = await supabase
-            .from('feedbacks')
-            .select('rating, is_positive, created_at, message, owner_reply, replied_at, ai_sentiment, ai_confidence, source')
-            .eq('business_id', id)
-            .gte('created_at', fromDate.toISOString())
-            .lte('created_at', toDate.toISOString())
-            .order('created_at', { ascending: true });
-
-        if (error) {
-            return res.status(500).json({ error: 'Failed to get analytics data' });
-        }
+        // Fetch all feedbacks in range
+        const { rows: feedbacks } = await query(
+            `SELECT rating, is_positive, created_at, message, owner_reply, replied_at, ai_sentiment, ai_confidence, source
+             FROM feedbacks
+             WHERE business_id = $1 AND created_at >= $2 AND created_at <= $3
+             ORDER BY created_at ASC`,
+            [id, fromDate.toISOString(), toDate.toISOString()]
+        );
 
         // Group data by date
         const groupedData = {};
@@ -1090,13 +1061,12 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
         while (currentDate <= toDate) {
             let label;
             if (groupBy === 'day') {
-                label = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+                label = currentDate.toISOString().split('T')[0];
             } else if (groupBy === 'week') {
-                // Get week number
                 const weekStart = new Date(currentDate);
                 weekStart.setDate(weekStart.getDate() - weekStart.getDay());
                 label = `Week ${weekStart.toISOString().split('T')[0]}`;
-            } else { // month
+            } else {
                 label = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
             }
 
@@ -1105,7 +1075,6 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
                 groupedData[label] = { positive: 0, negative: 0, total: 0, ratings: [] };
             }
 
-            // Advance date
             if (groupBy === 'day') {
                 currentDate.setDate(currentDate.getDate() + 1);
             } else if (groupBy === 'week') {
@@ -1144,12 +1113,11 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
         let cumulativeTotal = 0;
         const chartData = labels.map(label => {
             const data = groupedData[label];
-            const avgRating = data.ratings.length > 0
+            const avg = data.ratings.length > 0
                 ? (data.ratings.reduce((a, b) => a + b, 0) / data.ratings.length).toFixed(1)
                 : 0;
             cumulativeTotal += data.total;
 
-            // Format label for display
             let displayLabel = label;
             if (groupBy === 'day') {
                 const d = new Date(label);
@@ -1166,7 +1134,7 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
                 total: data.total,
                 positive: data.positive,
                 negative: data.negative,
-                avgRating: parseFloat(avgRating),
+                avgRating: parseFloat(avg),
                 cumulative: cumulativeTotal,
                 positiveRate: data.total > 0 ? Math.round((data.positive / data.total) * 100) : 0
             };
@@ -1180,9 +1148,7 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
             ? (feedbacks.reduce((sum, f) => sum + f.rating, 0) / totalFeedback).toFixed(1)
             : 0;
 
-        // --- Advanced Analytics ---
-
-        // Rating distribution (1-5 stars)
+        // Rating distribution
         const ratingDistribution = [1, 2, 3, 4, 5].map(star => ({
             star,
             name: `${star} ★`,
@@ -1190,7 +1156,7 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
             percentage: totalFeedback > 0 ? Math.round((feedbacks.filter(f => f.rating === star).length / totalFeedback) * 100) : 0
         }));
 
-        // Hourly activity heatmap (0-23 hours × 7 days of week)
+        // Hourly activity heatmap
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const hourlyHeatmap = [];
         const heatmapGrid = {};
@@ -1255,7 +1221,7 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
             percentage: totalFeedback > 0 ? Math.round((count / totalFeedback) * 100) : 0
         })).sort((a, b) => b.count - a.count);
 
-        // Top keywords from messages
+        // Top keywords
         const stopWords = new Set(['the', 'is', 'at', 'in', 'it', 'a', 'an', 'and', 'or', 'to', 'of', 'for', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'shall', 'not', 'but', 'if', 'they', 'them', 'their', 'this', 'that', 'these', 'those', 'my', 'your', 'his', 'her', 'its', 'our', 'we', 'you', 'i', 'me', 'he', 'she', 'with', 'on', 'from', 'by', 'are', 'am', 'so', 'very', 'just', 'all', 'no', 'yes', 'also', 'too', 'more', 'much', 'than', 'then', 'about', 'up', 'out', 'what', 'which', 'who', 'when', 'where', 'how', 'here', 'there', 'really', 'get', 'got', 'us']);
         const wordCounts = {};
         feedbacks.forEach(f => {
@@ -1331,18 +1297,15 @@ router.post('/:id/external-summaries', authenticate, async (req, res) => {
         }
 
         const summaryId = uuidv4();
-        const { error: insertError } = await supabase
-            .from('external_summaries')
-            .insert({
-                id: summaryId,
-                business_id: id,
-                source_type: sourceType || 'other',
-                title: title || `${sourceType || 'External'} Feedback - ${new Date().toLocaleDateString()}`,
-                raw_text: rawText.trim(),
-                is_analyzed: false
-            });
-
-        if (insertError) {
+        try {
+            await query(
+                `INSERT INTO external_summaries (id, business_id, source_type, title, raw_text, is_analyzed)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [summaryId, id, sourceType || 'other',
+                 title || `${sourceType || 'External'} Feedback - ${new Date().toLocaleDateString()}`,
+                 rawText.trim(), false]
+            );
+        } catch (insertError) {
             console.error('Insert external summary error:', insertError);
             return res.status(500).json({ error: 'Failed to save summary. Please ensure the external_summaries table exists.' });
         }
@@ -1375,16 +1338,14 @@ router.get('/:id/external-summaries', authenticate, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        const { data: summaries, error } = await supabase
-            .from('external_summaries')
-            .select('id, source_type, title, overall_sentiment, overall_score, positive_count, negative_count, total_reviews_found, is_analyzed, analyzed_at, created_at')
-            .eq('business_id', id)
-            .order('created_at', { ascending: false });
-
-        if (error) {
-            console.error('Fetch summaries error:', error);
-            return res.status(500).json({ error: 'Failed to fetch summaries' });
-        }
+        const { rows: summaries } = await query(
+            `SELECT id, source_type, title, overall_sentiment, overall_score, positive_count, negative_count,
+                    total_reviews_found, is_analyzed, analyzed_at, created_at
+             FROM external_summaries
+             WHERE business_id = $1
+             ORDER BY created_at DESC`,
+            [id]
+        );
 
         res.json({ summaries: summaries || [] });
     } catch (error) {
@@ -1406,14 +1367,14 @@ router.get('/:id/external-summaries/:summaryId', authenticate, async (req, res) 
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        const { data: summary, error } = await supabase
-            .from('external_summaries')
-            .select('*')
-            .eq('id', summaryId)
-            .eq('business_id', id)
-            .single();
+        const { rows } = await query(
+            'SELECT * FROM external_summaries WHERE id = $1 AND business_id = $2',
+            [summaryId, id]
+        );
 
-        if (error || !summary) {
+        const summary = rows[0];
+
+        if (!summary) {
             return res.status(404).json({ error: 'Summary not found' });
         }
 
@@ -1438,14 +1399,14 @@ router.post('/:id/external-summaries/:summaryId/analyze', authenticate, async (r
         }
 
         // Fetch the summary
-        const { data: summary, error: fetchError } = await supabase
-            .from('external_summaries')
-            .select('*')
-            .eq('id', summaryId)
-            .eq('business_id', id)
-            .single();
+        const { rows } = await query(
+            'SELECT * FROM external_summaries WHERE id = $1 AND business_id = $2',
+            [summaryId, id]
+        );
 
-        if (fetchError || !summary) {
+        const summary = rows[0];
+
+        if (!summary) {
             return res.status(404).json({ error: 'Summary not found' });
         }
 
@@ -1455,48 +1416,36 @@ router.post('/:id/external-summaries/:summaryId/analyze', authenticate, async (r
         const analysis = await analyzeBulkSummary(summary.raw_text, summary.source_type);
 
         // Update the summary with analysis results
-        const { error: updateError } = await supabase
-            .from('external_summaries')
-            .update({
-                analysis_result: analysis,
-                overall_sentiment: analysis.overallSentiment,
-                overall_score: analysis.overallScore,
-                positive_count: analysis.positiveCount,
-                negative_count: analysis.negativeCount,
-                total_reviews_found: analysis.totalFound,
-                is_analyzed: true,
-                analyzed_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', summaryId);
-
-        if (updateError) {
-            console.error('Update summary error:', updateError);
-        }
+        await query(
+            `UPDATE external_summaries SET
+                analysis_result = $1, overall_sentiment = $2, overall_score = $3,
+                positive_count = $4, negative_count = $5, total_reviews_found = $6,
+                is_analyzed = true, analyzed_at = $7, updated_at = $8
+             WHERE id = $9`,
+            [JSON.stringify(analysis), analysis.overallSentiment, analysis.overallScore,
+             analysis.positiveCount, analysis.negativeCount, analysis.totalFound,
+             new Date().toISOString(), new Date().toISOString(), summaryId]
+        );
 
         // Also save individual feedbacks to the main feedbacks table
         let savedCount = 0;
         if (analysis.feedbacks && analysis.feedbacks.length > 0) {
             for (const fb of analysis.feedbacks) {
                 const feedbackId = uuidv4();
-                const rating = Math.min(5, Math.max(1, fb.rating || 3));
-                const isPositive = fb.sentiment === 'positive' || rating >= 4;
+                const fbRating = Math.min(5, Math.max(1, fb.rating || 3));
+                const fbIsPositive = fb.sentiment === 'positive' || fbRating >= 4;
 
-                const { error: insertError } = await supabase
-                    .from('feedbacks')
-                    .insert({
-                        id: feedbackId,
-                        business_id: id,
-                        rating: rating,
-                        message: fb.text || fb.summary || 'External feedback',
-                        is_positive: isPositive,
-                        notified: false,
-                        source: summary.source_type || 'external',
-                        ai_sentiment: fb.sentiment,
-                        ai_confidence: fb.confidence
-                    });
-
-                if (!insertError) savedCount++;
+                try {
+                    await query(
+                        `INSERT INTO feedbacks (id, business_id, rating, message, is_positive, notified, source, ai_sentiment, ai_confidence)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                        [feedbackId, id, fbRating, fb.text || fb.summary || 'External feedback',
+                         fbIsPositive, false, summary.source_type || 'external', fb.sentiment, fb.confidence]
+                    );
+                    savedCount++;
+                } catch (insertError) {
+                    // Skip individual failures
+                }
             }
         }
 
@@ -1526,13 +1475,12 @@ router.delete('/:id/external-summaries/:summaryId', authenticate, async (req, re
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        const { error } = await supabase
-            .from('external_summaries')
-            .delete()
-            .eq('id', summaryId)
-            .eq('business_id', id);
+        const { rowCount } = await query(
+            'DELETE FROM external_summaries WHERE id = $1 AND business_id = $2',
+            [summaryId, id]
+        );
 
-        if (error) {
+        if (rowCount === 0) {
             return res.status(500).json({ error: 'Failed to delete summary' });
         }
 

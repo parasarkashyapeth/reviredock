@@ -1,4 +1,4 @@
-import { supabase } from '../db/supabase.js';
+import { query } from '../db/neon.js';
 
 /**
  * Admin authentication middleware
@@ -13,13 +13,14 @@ export const requireAdmin = async (req, res, next) => {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
-        const { data: user, error } = await supabase
-            .from('users')
-            .select('is_admin')
-            .eq('id', userId)
-            .single();
+        const { rows } = await query(
+            'SELECT is_admin FROM users WHERE id = $1',
+            [userId]
+        );
 
-        if (error || !user) {
+        const user = rows[0];
+
+        if (!user) {
             return res.status(403).json({ error: 'Access denied' });
         }
 

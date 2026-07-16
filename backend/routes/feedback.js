@@ -1,6 +1,6 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '../db/supabase.js';
+import { query } from '../db/neon.js';
 import { authenticate } from '../middleware/auth.js';
 import { feedbackLimiter } from '../middleware/rateLimit.js';
 import { analyzeFeedback, analyzeBulkFeedback, analyzeExternalFeedback, fetchAndAnalyzeUrl } from '../services/ai.js';
@@ -34,13 +34,14 @@ router.post('/:businessId', feedbackLimiter, async (req, res) => {
         }
 
         // Check if business exists
-        const { data: business, error: businessError } = await supabase
-            .from('businesses')
-            .select('id, google_review_url, subscription_plan, monthly_feedback_count, monthly_feedback_limit, last_reset_date')
-            .eq('id', businessId)
-            .single();
+        const { rows: businessRows } = await query(
+            'SELECT id, google_review_url, subscription_plan, monthly_feedback_count, monthly_feedback_limit, last_reset_date FROM businesses WHERE id = $1',
+            [businessId]
+        );
 
-        if (businessError || !business) {
+        const business = businessRows[0];
+
+        if (!business) {
             return res.status(404).json({ error: 'Business not found' });
         }
 
@@ -54,13 +55,10 @@ router.post('/:businessId', feedbackLimiter, async (req, res) => {
             // Reset if new month
             if (business.last_reset_date !== currentMonth) {
                 currentCount = 0;
-                await supabase
-                    .from('businesses')
-                    .update({
-                        monthly_feedback_count: 0,
-                        last_reset_date: currentMonth
-                    })
-                    .eq('id', businessId);
+                await query(
+                    'UPDATE businesses SET monthly_feedback_count = 0, last_reset_date = $1 WHERE id = $2',
+                    [currentMonth, businessId]
+                );
             }
 
             if (currentCount >= (business.monthly_feedback_limit || 50)) {
@@ -108,53 +106,43 @@ router.post('/:businessId', feedbackLimiter, async (req, res) => {
         }
 
         // Insert feedback with AI-corrected sentiment already applied
-        const { error: insertError } = await supabase
-            .from('feedbacks')
-            .insert({
-                id: feedbackId,
-                business_id: businessId,
-                rating: parseInt(rating),
-                message: message || null,
-                customer_email: customerEmail && customerEmail.trim() ? customerEmail.trim().toLowerCase() : null,
-                is_positive: isPositive,
-                ai_sentiment: aiSentiment,
-                ai_confidence: aiConfidence,
-                sentiment_mismatch: sentimentMismatch,
-                notified: false
-            });
-
-        if (insertError) {
+        try {
+            await query(
+                `INSERT INTO feedbacks (id, business_id, rating, message, customer_email, is_positive, ai_sentiment, ai_confidence, sentiment_mismatch, notified)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                [feedbackId, businessId, parseInt(rating), message || null,
+                 customerEmail && customerEmail.trim() ? customerEmail.trim().toLowerCase() : null,
+                 isPositive, aiSentiment, aiConfidence, sentimentMismatch, false]
+            );
+        } catch (insertError) {
             console.error('Insert error:', insertError);
             return res.status(500).json({ error: 'Failed to submit feedback' });
         }
 
         // Increment monthly count
-        await supabase
-            .from('businesses')
-            .update({ monthly_feedback_count: (business.monthly_feedback_count || 0) + 1 })
-            .eq('id', businessId);
+        await query(
+            'UPDATE businesses SET monthly_feedback_count = $1 WHERE id = $2',
+            [(business.monthly_feedback_count || 0) + 1, businessId]
+        );
 
         // Send email alert for negative feedback (non-blocking)
         if (!isPositive) {
             try {
                 // Look up the business owner's email from the users table
-                const { data: ownerUser } = await supabase
-                    .from('users')
-                    .select('email')
-                    .eq('business_id', businessId)
-                    .limit(1)
-                    .single();
+                const { rows: ownerRows } = await query(
+                    'SELECT email FROM users WHERE business_id = $1 LIMIT 1',
+                    [businessId]
+                );
 
-                const { data: businessDetails } = await supabase
-                    .from('businesses')
-                    .select('name')
-                    .eq('id', businessId)
-                    .single();
+                const { rows: businessDetails } = await query(
+                    'SELECT name FROM businesses WHERE id = $1',
+                    [businessId]
+                );
 
-                if (ownerUser?.email) {
+                if (ownerRows[0]?.email) {
                     sendNegativeFeedbackAlert(
-                        ownerUser.email,
-                        businessDetails?.name || 'Your Business',
+                        ownerRows[0].email,
+                        businessDetails[0]?.name || 'Your Business',
                         { message: message || '', rating, sentiment: aiSentiment }
                     ).catch(err => console.error('[Email] Alert failed:', err.message));
                 }
@@ -166,16 +154,13 @@ router.post('/:businessId', feedbackLimiter, async (req, res) => {
         // Get primary review platform URL (with fallback to legacy google_review_url)
         let reviewUrl = business.google_review_url
         if (isPositive) {
-            const { data: primaryPlatform } = await supabase
-                .from('review_platforms')
-                .select('url')
-                .eq('business_id', businessId)
-                .eq('is_primary', true)
-                .eq('is_active', true)
-                .single()
+            const { rows: platformRows } = await query(
+                'SELECT url FROM review_platforms WHERE business_id = $1 AND is_primary = true AND is_active = true LIMIT 1',
+                [businessId]
+            );
 
-            if (primaryPlatform?.url) {
-                reviewUrl = primaryPlatform.url
+            if (platformRows[0]?.url) {
+                reviewUrl = platformRows[0].url;
             }
         }
 
@@ -205,42 +190,46 @@ router.get('/:businessId', authenticate, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized to access this business' });
         }
 
-        // Build date filter
-        let query = supabase
-            .from('feedbacks')
-            .select('*')
-            .eq('business_id', businessId)
-            .order('created_at', { ascending: false });
+        // Build dynamic query
+        let sql = 'SELECT * FROM feedbacks WHERE business_id = $1';
+        const params = [businessId];
+        let paramIdx = 2;
 
         // Apply date filter
         const now = new Date();
         if (filter === 'today') {
             const today = now.toISOString().split('T')[0]; // YYYY-MM-DD in UTC
-            query = query.gte('created_at', today);
+            sql += ` AND created_at >= $${paramIdx}`;
+            params.push(today);
+            paramIdx++;
         } else if (filter === 'week') {
             const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            query = query.gte('created_at', weekAgo.toISOString());
+            sql += ` AND created_at >= $${paramIdx}`;
+            params.push(weekAgo.toISOString());
+            paramIdx++;
         } else if (filter === 'month') {
             const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            query = query.gte('created_at', monthAgo.toISOString());
+            sql += ` AND created_at >= $${paramIdx}`;
+            params.push(monthAgo.toISOString());
+            paramIdx++;
         } else if (filter === 'year') {
             const startOfYear = new Date(now.getFullYear(), 0, 1);
-            query = query.gte('created_at', startOfYear.toISOString());
+            sql += ` AND created_at >= $${paramIdx}`;
+            params.push(startOfYear.toISOString());
+            paramIdx++;
         }
         // filter === 'all' or undefined → no date filter → fetch everything
 
         // Apply type filter
         if (type === 'negative') {
-            query = query.eq('is_positive', false);
+            sql += ` AND is_positive = false`;
         } else if (type === 'positive') {
-            query = query.eq('is_positive', true);
+            sql += ` AND is_positive = true`;
         }
 
-        const { data: feedbacks, error } = await query.limit(500);
+        sql += ' ORDER BY created_at DESC LIMIT 500';
 
-        if (error) {
-            return res.status(500).json({ error: 'Failed to get feedbacks' });
-        }
+        const { rows: feedbacks } = await query(sql, params);
 
         // Strip customer_email for privacy but indicate if one exists
         const sanitized = (feedbacks || []).map(fb => {
@@ -280,36 +269,21 @@ router.post('/:businessId/external', authenticate, async (req, res) => {
         const feedbackId = uuidv4();
 
         // Insert the analyzed feedback
-        const { error: insertError } = await supabase
-            .from('feedbacks')
-            .insert({
-                id: feedbackId,
-                business_id: businessId,
-                rating: analysis.rating,
-                message: text.trim(),
-                is_positive: analysis.isPositive,
-                notified: false,
-                source: source || 'external',
-                ai_sentiment: analysis.sentiment,
-                ai_confidence: analysis.confidence,
-                ai_summary: analysis.summary,
-                ai_category: analysis.category
-            });
-
-        if (insertError) {
+        try {
+            await query(
+                `INSERT INTO feedbacks (id, business_id, rating, message, is_positive, notified, source, ai_sentiment, ai_confidence, ai_summary, ai_category)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                [feedbackId, businessId, analysis.rating, text.trim(), analysis.isPositive, false,
+                 source || 'external', analysis.sentiment, analysis.confidence, analysis.summary, analysis.category]
+            );
+        } catch (insertError) {
             // If columns don't exist, insert without AI fields
-            const { error: fallbackError } = await supabase
-                .from('feedbacks')
-                .insert({
-                    id: feedbackId,
-                    business_id: businessId,
-                    rating: analysis.rating,
-                    message: text.trim(),
-                    is_positive: analysis.isPositive,
-                    notified: false
-                });
-
-            if (fallbackError) {
+            try {
+                await query(
+                    'INSERT INTO feedbacks (id, business_id, rating, message, is_positive, notified) VALUES ($1, $2, $3, $4, $5, $6)',
+                    [feedbackId, businessId, analysis.rating, text.trim(), analysis.isPositive, false]
+                );
+            } catch (fallbackError) {
                 console.error('Insert external feedback error:', fallbackError);
                 return res.status(500).json({ error: 'Failed to save feedback' });
             }
@@ -343,30 +317,32 @@ router.get('/:businessId/ai-summary', authenticate, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        // Fetch feedbacks
-        let query = supabase
-            .from('feedbacks')
-            .select('*')
-            .eq('business_id', businessId)
-            .order('created_at', { ascending: false });
+        // Build dynamic query
+        let sql = 'SELECT * FROM feedbacks WHERE business_id = $1';
+        const params = [businessId];
+        let paramIdx = 2;
 
         const now = new Date();
         if (filter === 'today') {
             const today = now.toISOString().split('T')[0];
-            query = query.gte('created_at', today);
+            sql += ` AND created_at >= $${paramIdx}`;
+            params.push(today);
+            paramIdx++;
         } else if (filter === 'week') {
             const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            query = query.gte('created_at', weekAgo.toISOString());
+            sql += ` AND created_at >= $${paramIdx}`;
+            params.push(weekAgo.toISOString());
+            paramIdx++;
         } else if (filter === 'month') {
             const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            query = query.gte('created_at', monthAgo.toISOString());
+            sql += ` AND created_at >= $${paramIdx}`;
+            params.push(monthAgo.toISOString());
+            paramIdx++;
         }
 
-        const { data: feedbacks, error } = await query.limit(200);
+        sql += ' ORDER BY created_at DESC LIMIT 200';
 
-        if (error) {
-            return res.status(500).json({ error: 'Failed to fetch feedbacks' });
-        }
+        const { rows: feedbacks } = await query(sql, params);
 
         if (!feedbacks || feedbacks.length === 0) {
             return res.json({
@@ -422,21 +398,18 @@ router.post('/:businessId/analyze-url', authenticate, async (req, res) => {
         if (analysis.feedbacks && analysis.feedbacks.length > 0) {
             for (const fb of analysis.feedbacks) {
                 const feedbackId = uuidv4();
-                const rating = Math.min(5, Math.max(1, fb.rating || 3));
-                const isPositive = fb.sentiment === 'positive' || rating >= 4;
+                const fbRating = Math.min(5, Math.max(1, fb.rating || 3));
+                const fbIsPositive = fb.sentiment === 'positive' || fbRating >= 4;
 
-                const { error: insertError } = await supabase
-                    .from('feedbacks')
-                    .insert({
-                        id: feedbackId,
-                        business_id: businessId,
-                        rating: rating,
-                        message: fb.text || fb.summary || 'No text',
-                        is_positive: isPositive,
-                        notified: false
-                    });
-
-                if (!insertError) savedCount++;
+                try {
+                    await query(
+                        'INSERT INTO feedbacks (id, business_id, rating, message, is_positive, notified) VALUES ($1, $2, $3, $4, $5, $6)',
+                        [feedbackId, businessId, fbRating, fb.text || fb.summary || 'No text', fbIsPositive, false]
+                    );
+                    savedCount++;
+                } catch (insertError) {
+                    // Skip individual insert failures
+                }
             }
         }
 
@@ -471,20 +444,19 @@ router.post('/:businessId/:feedbackId/reply', authenticate, async (req, res) => 
         }
 
         // If reply is empty string, it means "hide/remove reply"
-        const updateData = reply.trim()
-            ? { owner_reply: reply.trim(), replied_at: new Date().toISOString() }
-            : { owner_reply: null, replied_at: null };
+        const ownerReply = reply.trim() ? reply.trim() : null;
+        const repliedAt = reply.trim() ? new Date().toISOString() : null;
 
-        const { data, error } = await supabase
-            .from('feedbacks')
-            .update(updateData)
-            .eq('id', feedbackId)
-            .eq('business_id', businessId)
-            .select()
-            .single();
+        const { rows } = await query(
+            `UPDATE feedbacks SET owner_reply = $1, replied_at = $2
+             WHERE id = $3 AND business_id = $4
+             RETURNING *`,
+            [ownerReply, repliedAt, feedbackId, businessId]
+        );
 
-        if (error) {
-            console.error('Reply error:', error);
+        const data = rows[0];
+
+        if (!data) {
             return res.status(500).json({ error: 'Failed to save reply' });
         }
 
@@ -496,15 +468,14 @@ router.post('/:businessId/:feedbackId/reply', authenticate, async (req, res) => 
         if (hasEmail) {
             (async () => {
                 try {
-                    const { data: biz } = await supabase
-                        .from('businesses')
-                        .select('name')
-                        .eq('id', businessId)
-                        .single();
+                    const { rows: bizRows } = await query(
+                        'SELECT name FROM businesses WHERE id = $1',
+                        [businessId]
+                    );
 
                     const result = await sendReplyToCustomer(
                         data.customer_email,
-                        biz?.name || 'The Business',
+                        bizRows[0]?.name || 'The Business',
                         {
                             originalMessage: data.message || '',
                             originalRating: data.rating,
@@ -536,14 +507,13 @@ router.delete('/:businessId/:feedbackId', authenticate, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        const { error } = await supabase
-            .from('feedbacks')
-            .delete()
-            .eq('id', feedbackId)
-            .eq('business_id', businessId);
+        const { rowCount } = await query(
+            'DELETE FROM feedbacks WHERE id = $1 AND business_id = $2',
+            [feedbackId, businessId]
+        );
 
-        if (error) {
-            console.error('Delete feedback error:', error);
+        if (rowCount === 0) {
+            console.error('Delete feedback error: no rows deleted');
             return res.status(500).json({ error: 'Failed to delete feedback' });
         }
 
@@ -568,26 +538,25 @@ router.patch('/:businessId/:feedbackId/pin', authenticate, async (req, res) => {
         }
 
         // Get current pin state
-        const { data: feedback, error: fetchError } = await supabase
-            .from('feedbacks')
-            .select('is_pinned')
-            .eq('id', feedbackId)
-            .eq('business_id', businessId)
-            .single();
+        const { rows } = await query(
+            'SELECT is_pinned FROM feedbacks WHERE id = $1 AND business_id = $2',
+            [feedbackId, businessId]
+        );
 
-        if (fetchError || !feedback) {
+        const feedback = rows[0];
+
+        if (!feedback) {
             return res.status(404).json({ error: 'Feedback not found' });
         }
 
         const newPinState = !feedback.is_pinned;
 
-        const { error: updateError } = await supabase
-            .from('feedbacks')
-            .update({ is_pinned: newPinState })
-            .eq('id', feedbackId)
-            .eq('business_id', businessId);
+        const { rowCount } = await query(
+            'UPDATE feedbacks SET is_pinned = $1 WHERE id = $2 AND business_id = $3',
+            [newPinState, feedbackId, businessId]
+        );
 
-        if (updateError) {
+        if (rowCount === 0) {
             return res.status(500).json({ error: 'Failed to update pin status' });
         }
 
@@ -612,36 +581,40 @@ router.get('/:businessId/export', authenticate, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        let query = supabase
-            .from('feedbacks')
-            .select('*')
-            .eq('business_id', businessId)
-            .order('created_at', { ascending: false });
+        let sql = 'SELECT * FROM feedbacks WHERE business_id = $1';
+        const params = [businessId];
+        let paramIdx = 2;
 
         // Apply date filter
         const now = new Date();
         if (filter === 'today') {
-            query = query.gte('created_at', now.toISOString().split('T')[0]);
+            sql += ` AND created_at >= $${paramIdx}`;
+            params.push(now.toISOString().split('T')[0]);
+            paramIdx++;
         } else if (filter === 'week') {
-            query = query.gte('created_at', new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString());
+            sql += ` AND created_at >= $${paramIdx}`;
+            params.push(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString());
+            paramIdx++;
         } else if (filter === 'month') {
-            query = query.gte('created_at', new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString());
+            sql += ` AND created_at >= $${paramIdx}`;
+            params.push(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString());
+            paramIdx++;
         } else if (filter === 'year') {
-            query = query.gte('created_at', new Date(now.getFullYear(), 0, 1).toISOString());
+            sql += ` AND created_at >= $${paramIdx}`;
+            params.push(new Date(now.getFullYear(), 0, 1).toISOString());
+            paramIdx++;
         }
 
-        if (type === 'negative') query = query.eq('is_positive', false);
-        else if (type === 'positive') query = query.eq('is_positive', true);
+        if (type === 'negative') sql += ' AND is_positive = false';
+        else if (type === 'positive') sql += ' AND is_positive = true';
 
-        const { data: feedbacks, error } = await query.limit(5000);
+        sql += ' ORDER BY created_at DESC LIMIT 5000';
 
-        if (error) {
-            return res.status(500).json({ error: 'Failed to export feedbacks' });
-        }
+        const { rows: feedbacks } = await query(sql, params);
 
         // Build CSV
         const headers = ['Date', 'Time', 'Rating', 'Sentiment', 'Message', 'AI Sentiment', 'AI Confidence', 'Owner Reply', 'Reply Date'];
-        const rows = (feedbacks || []).map(fb => {
+        const csvRows = (feedbacks || []).map(fb => {
             const date = fb.created_at ? new Date(fb.created_at) : null;
             return [
                 date ? date.toLocaleDateString() : '',
@@ -656,7 +629,7 @@ router.get('/:businessId/export', authenticate, async (req, res) => {
             ].join(',');
         });
 
-        const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+        const csv = '\uFEFF' + [headers.join(','), ...csvRows].join('\r\n');
 
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename=feedbacks_${new Date().toISOString().split('T')[0]}.csv`);

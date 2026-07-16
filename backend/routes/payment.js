@@ -2,7 +2,7 @@ import { Router } from 'express';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { authenticate } from '../middleware/auth.js';
-import { supabase } from '../db/supabase.js';
+import { query } from '../db/neon.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
@@ -86,10 +86,6 @@ function applyCoupon(baseAmount, couponCode) {
 }
 
 /**
- * POST /api/payment/create-payment-link
- * Create a Razorpay Payment Link (hosted checkout — no domain whitelisting needed)
- */
-/**
  * POST /api/payment/validate-coupon
  * Validate a coupon code and return discount info — no auth required.
  */
@@ -120,6 +116,10 @@ router.post('/validate-coupon', async (req, res) => {
     });
 });
 
+/**
+ * POST /api/payment/create-payment-link
+ * Create a Razorpay Payment Link (hosted checkout — no domain whitelisting needed)
+ */
 router.post('/create-payment-link', authenticate, async (req, res) => {
     try {
         if (!razorpay) {
@@ -146,22 +146,24 @@ router.post('/create-payment-link', authenticate, async (req, res) => {
         console.log(`[Payment] Plan: ${plan.name} | Base: ${plan.amount} paise | Final: ${finalAmount} paise | Coupon: ${couponResult ? couponResult.discountPct + '%' : 'none'}`);
 
         // Check if user already has this plan
-        const { data: business } = await supabase
-            .from('businesses')
-            .select('subscription_plan')
-            .eq('id', businessId)
-            .single();
+        const { rows: businessRows } = await query(
+            'SELECT subscription_plan FROM businesses WHERE id = $1',
+            [businessId]
+        );
+
+        const business = businessRows[0];
 
         if (business?.subscription_plan === 'paid') {
             return res.status(400).json({ error: 'You already have an active Pro plan' });
         }
 
         // Fetch user email for prefill
-        const { data: userData } = await supabase
-            .from('users')
-            .select('email')
-            .eq('id', userId)
-            .single();
+        const { rows: userRows } = await query(
+            'SELECT email FROM users WHERE id = $1',
+            [userId]
+        );
+
+        const userData = userRows[0];
 
         // Generate a unique reference ID for this payment
         const referenceId = `pay_${businessId.substring(0, 8)}_${Date.now()}`;
@@ -204,20 +206,11 @@ router.post('/create-payment-link', authenticate, async (req, res) => {
 
         // Store the payment record in our database
         const paymentId = uuidv4();
-        await supabase
-            .from('payments')
-            .insert({
-                id: paymentId,
-                business_id: businessId,
-                user_id: userId,
-                razorpay_order_id: paymentLink.order_id || '',
-                razorpay_payment_link_id: paymentLink.id,
-                plan_id: planId,
-                amount: finalAmount,
-                currency: plan.currency,
-                status: 'created',
-                reference_id: referenceId,
-            });
+        await query(
+            `INSERT INTO payments (id, business_id, user_id, razorpay_order_id, razorpay_payment_link_id, plan_id, amount, currency, status, reference_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            [paymentId, businessId, userId, paymentLink.order_id || '', paymentLink.id, planId, finalAmount, plan.currency, 'created', referenceId]
+        );
 
         console.log(`📦 [Payment] Payment link created for business ${businessId}: ${paymentLink.short_url}`);
 
@@ -318,14 +311,14 @@ router.post('/webhook', async (req, res) => {
             }
 
             // ── Step 3: Find the payment record ──
-            const { data: payment, error: fetchError } = await supabase
-                .from('payments')
-                .select('*')
-                .eq('reference_id', referenceId)
-                .eq('business_id', businessId)
-                .single();
+            const { rows: paymentRows } = await query(
+                'SELECT * FROM payments WHERE reference_id = $1 AND business_id = $2',
+                [referenceId, businessId]
+            );
 
-            if (fetchError || !payment) {
+            const payment = paymentRows[0];
+
+            if (!payment) {
                 console.error('[Webhook] Payment record not found for reference_id:', referenceId);
                 // Still return 200 so Razorpay doesn't retry endlessly
                 return res.status(200).json({ status: 'payment record not found' });
@@ -343,27 +336,18 @@ router.post('/webhook', async (req, res) => {
             expiresAt.setMonth(expiresAt.getMonth() + plan.duration_months);
 
             // ── Step 5: Update payment record ──
-            await supabase
-                .from('payments')
-                .update({
-                    razorpay_payment_id: razorpayPaymentId,
-                    razorpay_order_id: razorpayOrderId,
-                    razorpay_payment_link_id: paymentLinkId,
-                    status: 'paid',
-                    paid_at: now.toISOString(),
-                    expires_at: expiresAt.toISOString(),
-                    updated_at: now.toISOString(),
-                })
-                .eq('id', payment.id);
+            await query(
+                `UPDATE payments SET razorpay_payment_id = $1, razorpay_order_id = $2, razorpay_payment_link_id = $3,
+                 status = 'paid', paid_at = $4, expires_at = $5, updated_at = $6
+                 WHERE id = $7`,
+                [razorpayPaymentId, razorpayOrderId, paymentLinkId, now.toISOString(), expiresAt.toISOString(), now.toISOString(), payment.id]
+            );
 
             // ── Step 6: Upgrade the business plan ──
-            await supabase
-                .from('businesses')
-                .update({
-                    subscription_plan: plan.subscription_plan,
-                    monthly_feedback_limit: plan.monthly_feedback_limit,
-                })
-                .eq('id', businessId);
+            await query(
+                'UPDATE businesses SET subscription_plan = $1, monthly_feedback_limit = $2 WHERE id = $3',
+                [plan.subscription_plan, plan.monthly_feedback_limit, businessId]
+            );
 
             console.log(`✅ [Webhook] Business ${businessId} upgraded to ${plan.name} (expires ${expiresAt.toISOString()})`);
             return res.status(200).json({ status: 'ok' });
@@ -377,14 +361,11 @@ router.post('/webhook', async (req, res) => {
             const businessId = notes.business_id;
 
             if (referenceId && businessId) {
-                await supabase
-                    .from('payments')
-                    .update({
-                        status: 'failed',
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq('reference_id', referenceId)
-                    .eq('business_id', businessId);
+                await query(
+                    `UPDATE payments SET status = 'failed', updated_at = $1
+                     WHERE reference_id = $2 AND business_id = $3`,
+                    [new Date().toISOString(), referenceId, businessId]
+                );
 
                 console.log(`❌ [Webhook] Payment failed for reference ${referenceId}`);
             }
@@ -412,14 +393,14 @@ router.get('/status/:referenceId', authenticate, async (req, res) => {
         const { referenceId } = req.params;
         const { businessId } = req.user;
 
-        const { data: payment, error } = await supabase
-            .from('payments')
-            .select('id, plan_id, amount, currency, status, paid_at, expires_at, created_at')
-            .eq('reference_id', referenceId)
-            .eq('business_id', businessId)
-            .single();
+        const { rows } = await query(
+            'SELECT id, plan_id, amount, currency, status, paid_at, expires_at, created_at FROM payments WHERE reference_id = $1 AND business_id = $2',
+            [referenceId, businessId]
+        );
 
-        if (error || !payment) {
+        const payment = rows[0];
+
+        if (!payment) {
             return res.status(404).json({ error: 'Payment not found' });
         }
 
@@ -445,16 +426,10 @@ router.get('/history', authenticate, async (req, res) => {
     try {
         const { businessId } = req.user;
 
-        const { data: payments, error } = await supabase
-            .from('payments')
-            .select('id, plan_id, amount, currency, status, paid_at, expires_at, created_at')
-            .eq('business_id', businessId)
-            .order('created_at', { ascending: false })
-            .limit(20);
-
-        if (error) {
-            return res.status(500).json({ error: 'Failed to fetch payment history' });
-        }
+        const { rows: payments } = await query(
+            'SELECT id, plan_id, amount, currency, status, paid_at, expires_at, created_at FROM payments WHERE business_id = $1 ORDER BY created_at DESC LIMIT 20',
+            [businessId]
+        );
 
         res.json({
             payments: (payments || []).map(p => ({
